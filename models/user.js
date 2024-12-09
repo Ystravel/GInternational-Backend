@@ -45,7 +45,7 @@ const schema = new Schema({
   },
   avatar: {
     type: String,
-    default: 'https://res.cloudinary.com/dcwkukgf3/image/upload/w_1000,c_fill,ar_1:1,g_auto,r_max,bo_5px_solid_red,b_rgb:262c35/v1733472837/avatar_purple_robot_fenjig.webp'
+    default: 'https://res.cloudinary.com/dcwkukgf3/image/upload/v1733472837/avatar_purple_robot_fenjig.webp'
   },
   tokens: {
     type: [String]

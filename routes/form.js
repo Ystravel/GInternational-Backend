@@ -9,32 +9,32 @@ const router = Router()
 
 router.post('/',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER]),
+  checkRole([UserRole.ADMIN]),
   create
 )
 
 router.get('/',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER]),
+  checkRole([UserRole.ADMIN]),
   search
 )
 
 router.delete('/:id',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER]),
+  checkRole([UserRole.ADMIN]),
   remove
 )
 
 router.post('/upload/pdf',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER]),
+  checkRole([UserRole.ADMIN]),
   uploadForm,
   uploadPDF
 )
 
 router.get('/next-number',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER]),
+  checkRole([UserRole.ADMIN]),
   getNextNumber
 )
 

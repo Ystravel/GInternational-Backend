@@ -428,7 +428,8 @@ export const search = async (req, res) => {
       query.$or = [
         { name: searchRegex },
         { userId: searchRegex },
-        { email: searchRegex }
+        { email: searchRegex },
+        { note: searchRegex }
       ]
     }
 

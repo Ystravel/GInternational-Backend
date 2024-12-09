@@ -8,6 +8,9 @@ const formSchema = new Schema({
   clientName: {
     type: String
   },
+  projectName: {
+    type: String
+  },
   formTemplate: {
     type: Schema.Types.ObjectId,
     ref: 'formTemplates',

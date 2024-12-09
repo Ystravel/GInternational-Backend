@@ -8,8 +8,8 @@ import mongoSanitize from 'express-mongo-sanitize'
 // 導入路由
 import routeUser from './routes/user.js'
 import routeAuditLog from './routes/auditLog.js'
-// import routeFormTemplate from './routes/formTemplate.js'
-// import routeForm from './routes/form.js'
+import routeFormTemplate from './routes/formTemplate.js'
+import routeForm from './routes/form.js'
 
 // passport
 import './passport/passport.js'
@@ -34,8 +34,8 @@ app.use(mongoSanitize())
 app.use('/uploads', express.static(process.env.UPLOAD_PATH))
 app.use('/user', routeUser)
 app.use('/auditLog', routeAuditLog)
-// app.use('/formTemplates', routeFormTemplate)
-// app.use('/forms', routeForm)
+app.use('/formTemplates', routeFormTemplate)
+app.use('/forms', routeForm)
 
 app.all('*', (req, res) => {
   res.status(StatusCodes.NOT_FOUND).json({

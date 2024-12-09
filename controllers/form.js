@@ -77,7 +77,8 @@ export const create = async (req, res) => {
       clientName: req.body.clientName,
       formTemplate: req.body.formTemplate,
       creator: req.user._id,
-      pdfUrl: req.body.pdfUrl
+      pdfUrl: req.body.pdfUrl,
+      projectName: req.body.projectName
     })
 
     // 3. 記錄審計日誌
@@ -166,7 +167,6 @@ export const search = async (req, res) => {
     // 處理日期範圍查詢 (先處理日期)
     if (req.query.date) {
       const dates = Array.isArray(req.query.date) ? req.query.date : [req.query.date]
-
       if (dates.length === 1) {
         const startDate = new Date(dates[0])
         startDate.setHours(0, 0, 0, 0)
@@ -182,20 +182,14 @@ export const search = async (req, res) => {
       }
     }
 
-    // 處理具體模板搜尋 (如果有指定具體模板，優先使用)
+    // 處理具體模板搜尋
     if (req.query.formTemplate) {
       query.formTemplate = new mongoose.Types.ObjectId(req.query.formTemplate)
     } else {
-      // 如果沒有指定具體模板，才處理公司和類型搜尋
       const templateQuery = {}
-      if (req.query.company) {
-        templateQuery.company = new mongoose.Types.ObjectId(req.query.company)
-      }
       if (req.query.type) {
         templateQuery.type = req.query.type
       }
-
-      // 如果有公司或類型條件，查詢符合條件的模板
       if (Object.keys(templateQuery).length > 0) {
         const templates = await FormTemplate.find(templateQuery).select('_id')
         const templateIds = templates.map(t => t._id)
@@ -208,7 +202,8 @@ export const search = async (req, res) => {
       const searchRegex = new RegExp(req.query.quickSearch, 'i')
       query.$or = [
         { formNumber: searchRegex },
-        { clientName: searchRegex }
+        { clientName: searchRegex },
+        { projectName: searchRegex }
       ]
     }
 
@@ -229,15 +224,6 @@ export const search = async (req, res) => {
         }
       },
       { $unwind: { path: '$formTemplate', preserveNullAndEmptyArrays: true } },
-      {
-        $lookup: {
-          from: 'companies',
-          localField: 'formTemplate.company',
-          foreignField: '_id',
-          as: 'formTemplate.company'
-        }
-      },
-      { $unwind: { path: '$formTemplate.company', preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
           from: 'users',
