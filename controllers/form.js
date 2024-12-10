@@ -1,6 +1,5 @@
 import Form from '../models/form.js'
 import { StatusCodes } from 'http-status-codes'
-import AuditLog from '../models/auditLog.js'
 import FormTemplate from '../models/formTemplate.js'
 import mongoose from 'mongoose'
 import path from 'path'
@@ -81,35 +80,6 @@ export const create = async (req, res) => {
       projectName: req.body.projectName
     })
 
-    // 3. 記錄審計日誌
-    await AuditLog.create({
-      operatorId: req.user._id,
-      operatorInfo: {
-        name: req.user.name,
-        userId: req.user.userId
-      },
-      action: '創建',
-      targetId: result._id,
-      targetInfo: {
-        name: result.formNumber
-      },
-      targetModel: 'forms',
-      changes: {
-        表單編號: {
-          from: null,
-          to: result.formNumber
-        },
-        客戶名稱: {
-          from: null,
-          to: result.clientName
-        },
-        PDF檔案: {
-          from: null,
-          to: result.pdfUrl
-        }
-      }
-    })
-
     res.status(StatusCodes.OK).json({
       success: true,
       message: '表單建立成功',
@@ -157,9 +127,6 @@ export const create = async (req, res) => {
 // 搜尋表單
 export const search = async (req, res) => {
   try {
-    console.log('收到搜尋請求')
-    console.log('查詢參數:', req.query)
-
     const itemsPerPage = parseInt(req.query.itemsPerPage) || 10
     const page = parseInt(req.query.page) || 1
     const query = {}
@@ -206,8 +173,6 @@ export const search = async (req, res) => {
         { projectName: searchRegex }
       ]
     }
-
-    console.log('最終查詢條件:', query)
 
     // 設置排序
     const sortField = req.query.sort || 'formNumber'
@@ -289,34 +254,8 @@ export const remove = async (req, res) => {
       console.error('刪除檔案失敗:', error)
     }
 
-    // // 刪除 Cloudinary 上的 PDF 檔案
-    // await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' })
     await result.deleteOne()
 
-    // 記錄審計日誌
-    await AuditLog.create({
-      operatorId: req.user._id,
-      operatorInfo: {
-        name: req.user.name,
-        userId: req.user.userId
-      },
-      action: '刪除',
-      targetId: result._id,
-      targetInfo: {
-        formNumber: result.formNumber
-      },
-      targetModel: 'forms',
-      changes: {
-        表單編號: {
-          from: result.formNumber,
-          to: null
-        },
-        PDF檔案: {
-          from: result.pdfUrl,
-          to: null
-        }
-      }
-    })
 
     res.status(StatusCodes.OK).json({
       success: true,

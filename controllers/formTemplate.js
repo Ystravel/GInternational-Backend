@@ -1,6 +1,5 @@
 import FormTemplate from '../models/formTemplate.js'
 import { StatusCodes } from 'http-status-codes'
-import AuditLog from '../models/auditLog.js'
 
 // 創建表單模板
 export const create = async (req, res) => {
@@ -23,34 +22,6 @@ export const create = async (req, res) => {
       name: req.body.name,
       type: req.body.type,
       componentName: req.body.componentName
-    })
-
-    await AuditLog.create({
-      operatorId: req.user._id,
-      operatorInfo: {
-        name: req.user.name,
-        userId: req.user.userId
-      },
-      action: '創建',
-      targetId: result._id,
-      targetInfo: {
-        name: result.name
-      },
-      targetModel: 'formTemplates',
-      changes: {
-        表單名稱: {
-          from: null,
-          to: result.name
-        },
-        表單類型: {
-          from: null,
-          to: result.type
-        },
-        組件名稱: {
-          from: null,
-          to: result.componentName
-        }
-      }
     })
 
     res.status(StatusCodes.OK).json({
@@ -138,33 +109,6 @@ export const edit = async (req, res) => {
       { new: true, runValidators: true }
     )
 
-    await AuditLog.create({
-      operatorId: req.user._id,
-      operatorInfo: {
-        name: req.user.name,
-        userId: req.user.userId
-      },
-      action: '修改',
-      targetId: result._id,
-      targetInfo: {
-        name: result.name
-      },
-      targetModel: 'formTemplates',
-      changes: {
-        表單名稱: {
-          from: original.name,
-          to: result.name
-        },
-        表單類型: {
-          from: original.type,
-          to: result.type
-        },
-        組件名稱: {
-          from: original.componentName,
-          to: result.componentName
-        }
-      }
-    })
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -205,26 +149,6 @@ export const remove = async (req, res) => {
     if (!result) throw new Error('NOT FOUND')
 
     await result.deleteOne()
-
-    await AuditLog.create({
-      operatorId: req.user._id,
-      operatorInfo: {
-        name: req.user.name,
-        userId: req.user.userId
-      },
-      action: '刪除',
-      targetId: result._id,
-      targetInfo: {
-        name: result.name
-      },
-      targetModel: 'formTemplates',
-      changes: {
-        表單名稱: {
-          from: result.name,
-          to: null
-        }
-      }
-    })
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -285,22 +209,14 @@ export const getById = async (req, res) => {
 // 添加搜尋方法
 export const search = async (req, res) => {
   try {
-    console.log('收到搜尋請求')
-    console.log('查詢參數:', req.query)
-
     const query = {}
 
     if (req.query.type) {
       query.type = req.query.type
-      console.log('添加類型條件:', query.type)
     }
-
-    console.log('最終查詢條件:', query)
 
     const result = await FormTemplate.find(query)
       .sort({ name: 1 })
-
-    console.log('查詢結果:', result)
 
     res.status(StatusCodes.OK).json({
       success: true,

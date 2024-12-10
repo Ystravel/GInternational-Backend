@@ -7,7 +7,6 @@ import mongoSanitize from 'express-mongo-sanitize'
 
 // 導入路由
 import routeUser from './routes/user.js'
-import routeAuditLog from './routes/auditLog.js'
 import routeFormTemplate from './routes/formTemplate.js'
 import routeForm from './routes/form.js'
 
@@ -33,7 +32,6 @@ app.use(mongoSanitize())
 
 app.use('/uploads', express.static(process.env.UPLOAD_PATH))
 app.use('/user', routeUser)
-app.use('/auditLog', routeAuditLog)
 app.use('/formTemplates', routeFormTemplate)
 app.use('/forms', routeForm)
 
