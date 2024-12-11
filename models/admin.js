@@ -17,13 +17,6 @@ const schema = new Schema({
     type: String,
     required: [true, '請輸入使用者密碼']
   },
-  userId: {
-    type: String,
-    sparse: true,
-    unique: true,
-    uppercase: true,
-    set: v => (v === '' ? null : v)
-  },
   adminId: {
     type: String,
     sparse: true,
@@ -31,29 +24,12 @@ const schema = new Schema({
     uppercase: true,
     set: v => (v === '' ? null : v)
   },
-  role: {
-    type: Number,
-    required: true,
-    default: UserRole.USER  // 改回 0，對應一般員工
-  },
   note: {
     type: String
   },
-  resetPasswordToken: {
-    type: String,
-    default: undefined
-  },
-  resetPasswordExpires: {
-    type: Date,
-    default: undefined
-  },
-  lastEmailSent: { // 新增欄位跟蹤最後一次發送郵件的時間
-    type: Date,
-    default: undefined
-  },
   avatar: {
     type: String,
-    default: 'https://res.cloudinary.com/dcwkukgf3/image/upload/v1733472837/avatar_purple_robot_fenjig.webp'
+    default: 'https://res.cloudinary.com/dcwkukgf3/image/upload/v1733904310/avatar_purple_robot_admin_yi29bu.webp'
   },
   tokens: {
     type: [String]

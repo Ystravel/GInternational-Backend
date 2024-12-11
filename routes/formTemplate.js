@@ -16,7 +16,7 @@ const router = Router()
 // 取得所有表單模板
 router.get('/all',
   auth.jwt,
-  checkRole([UserRole.ADMIN]),
+  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   getAll
 )
 
@@ -51,7 +51,7 @@ router.delete('/:id',
 // 取得單個表單模板
 router.get('/:id',
   auth.jwt,
-  checkRole([UserRole.ADMIN]),
+  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   getById
 )
 

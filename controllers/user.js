@@ -8,7 +8,8 @@ import crypto from 'crypto'
 import nodemailer from 'nodemailer'
 import { fileURLToPath } from 'url'
 import path, { dirname } from 'path'
-import { getNextUserNumber } from '../utils/sequence.js'
+import { getNextUserNumber, getNextAdminNumber } from '../utils/sequence.js'
+import UserRole from '../enums/UserRole.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -25,17 +26,27 @@ const transporter = nodemailer.createTransport({
 
 export const create = async (req, res) => {
   try {
-    // 生成員工編號
-    const userId = await getNextUserNumber()
+    const { isAdmin } = req.body
+    let idNumber
+
+    if (isAdmin) {
+      idNumber = await getNextAdminNumber()
+      req.body.adminId = idNumber
+      req.body.role = UserRole.ADMIN
+      delete req.body.userId
+    } else {
+      idNumber = await getNextUserNumber()
+      req.body.userId = idNumber
+      delete req.body.adminId
+    }
 
     const result = await User.create({
-      ...req.body,
-      userId
+      ...req.body
     })
 
     res.status(StatusCodes.OK).json({
       success: true,
-      message: '用戶創建成功',
+      message: isAdmin ? '管理者創建成功' : '用戶創建成功',
       result: {
         ...result.toObject(),
         password: undefined
@@ -123,6 +134,7 @@ export const googleLogin = async (req, res) => {
         role: user.role,
         userId: user.userId,
         avatar: user.avatar,
+        adminId: user.adminId,
         note: user.note
       }
     })
@@ -145,7 +157,8 @@ export const profile = async (req, res) => {
         userId: user.userId,
         role: user.role,
         note: user.note,
-        avatar: user.avatar
+        avatar: user.avatar,
+        adminId: user.adminId
       }
     })
   } catch (error) {
@@ -423,14 +436,31 @@ export const search = async (req, res) => {
       query.role = Number(req.query.role)
     }
 
-    if (req.query.quickSearch) {
-      const searchRegex = new RegExp(req.query.quickSearch, 'i')
+    if (req.query.excludeRole === 'true') {
       query.$or = [
-        { name: searchRegex },
-        { userId: searchRegex },
-        { email: searchRegex },
-        { note: searchRegex }
+        { role: UserRole.USER },
+        { role: UserRole.MANAGER }
       ]
+    }
+
+    if (req.query.quickSearch) {
+      const searchQuery = [
+        { name: new RegExp(req.query.quickSearch, 'i') },
+        { userId: new RegExp(req.query.quickSearch, 'i') },
+        { email: new RegExp(req.query.quickSearch, 'i') },
+        { note: new RegExp(req.query.quickSearch, 'i') },
+        { adminId: new RegExp(req.query.quickSearch, 'i') }
+      ]
+      
+      if (query.$or) {
+        query.$and = [
+          { $or: query.$or },
+          { $or: searchQuery }
+        ]
+        delete query.$or
+      } else {
+        query.$or = searchQuery
+      }
     }
 
     const result = await User.find(query)
@@ -458,32 +488,41 @@ export const search = async (req, res) => {
 // 統一錯誤處理
 const handleError = (res, error) => {
   console.error('Error details:', error)
+  
   if (error.name === 'ValidationError') {
     const key = Object.keys(error.errors)[0]
     const message = error.errors[key].message
-    res.status(StatusCodes.BAD_REQUEST).json({
+    return res.status(StatusCodes.BAD_REQUEST).json({
       success: false,
       message
     })
-  } else if (error.name === 'MongoServerError' && error.code === 11000) {
-    res.status(StatusCodes.CONFLICT).json({
+  }
+
+  if (error.code === 11000) {
+    // 處理重複鍵錯誤
+    const field = Object.keys(error.keyPattern)[0]
+    let message
+    switch (field) {
+      case 'email':
+        message = 'Email 已註冊'
+        break
+      case 'userId':
+        message = '使用者編號已註冊'
+        break
+      case 'adminId':
+        message = '管理者編號已註冊'
+        break
+      default:
+        message = '資料重複'
+    }
+    return res.status(StatusCodes.BAD_REQUEST).json({
       success: false,
-      message: '此Email已被註冊'
-    })
-  } else if (error.message === 'ID') {
-    res.status(StatusCodes.BAD_REQUEST).json({
-      success: false,
-      message: '用戶 ID 格式錯誤'
-    })
-  } else if (error.message === 'NOT FOUND') {
-    res.status(StatusCodes.NOT_FOUND).json({
-      success: false,
-      message: '查無用戶'
-    })
-  } else {
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-      success: false,
-      message: '未知錯誤'
+      message
     })
   }
+
+  return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+    success: false,
+    message: '未知錯誤'
+  })
 } 
