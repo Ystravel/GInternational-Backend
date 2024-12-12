@@ -509,6 +509,7 @@ export const search = async (req, res) => {
         { note: new RegExp(req.query.quickSearch, 'i') }
       ]
       
+      // 組合搜尋條件
       query = {
         $and: [
           { 
