@@ -492,13 +492,14 @@ export const search = async (req, res) => {
   try {
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
     const page = parseInt(req.query.page) || 1
-    let query = {}
-
-    // 使用 $or 來查詢多個特定角色值
-    query.$or = [
-      { role: UserRole.USER },
-      { role: UserRole.MANAGER }
-    ]
+    
+    // 使用 $or 來查詢一般用戶和經理
+    let query = { 
+      $or: [
+        { role: UserRole.USER },
+        { role: UserRole.MANAGER }
+      ]
+    }
 
     if (req.query.quickSearch) {
       const searchQuery = [
@@ -508,21 +509,27 @@ export const search = async (req, res) => {
         { note: new RegExp(req.query.quickSearch, 'i') }
       ]
       
-      // 組合搜尋條件
       query = {
         $and: [
-          { $or: [{ role: UserRole.USER }, { role: UserRole.MANAGER }] },
+          { 
+            $or: [
+              { role: UserRole.USER },
+              { role: UserRole.MANAGER }
+            ]
+          },
           { $or: searchQuery }
         ]
       }
     }
 
+    // 先獲取總數
+    const total = await User.countDocuments(query)
+
+    // 然後獲取分頁數據
     const result = await User.find(query)
       .sort({ [req.query.sortBy || 'userId']: req.query.sortOrder === 'desc' ? -1 : 1 })
       .skip((page - 1) * itemsPerPage)
       .limit(itemsPerPage)
-
-    const total = await User.countDocuments(query)
 
     res.status(StatusCodes.OK).json({
       success: true,
