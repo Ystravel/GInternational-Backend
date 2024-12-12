@@ -53,11 +53,6 @@ passport.use('jwt', new passportJWT.Strategy({
       throw new Error('JWT')
     }
 
-    // // 檢查員工任職狀態
-    // if (user.employmentStatus !== '在職') {
-    //   throw new Error('ACCOUNT_DISABLED')
-    // }
-
     return done(null, { user, token }, null)
   } catch (error) {
     if (error.message === 'TOKEN_EXPIRED') {

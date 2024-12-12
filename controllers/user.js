@@ -40,6 +40,10 @@ export const create = async (req, res) => {
       delete req.body.adminId
     }
 
+    if (!req.body.employmentStatus) {
+      req.body.employmentStatus = '在職'
+    }
+
     const result = await User.create({
       ...req.body
     })
@@ -99,6 +103,7 @@ const oauth2Client = new OAuth2Client(
 export const googleLogin = async (req, res) => {
   try {
     const { code } = req.body
+    
     const { tokens } = await oauth2Client.getToken(code)
     const ticket = await oauth2Client.verifyIdToken({
       idToken: tokens.id_token,
@@ -140,7 +145,10 @@ export const googleLogin = async (req, res) => {
     })
   } catch (error) {
     console.error('Google驗證錯誤:', error)
-    handleError(res, error)
+    res.status(401).json({
+      success: false,
+      message: 'Google登入驗證失敗'
+    })
   }
 }
 
@@ -296,6 +304,14 @@ export const edit = async (req, res) => {
     const updateData = { ...req.body }
     delete updateData.password
 
+    if (updateData.employmentStatus && 
+        !['在職', '離職', '退休', '留職停薪'].includes(updateData.employmentStatus)) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '無效的任職狀態'
+      })
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
       updateData,
@@ -426,40 +442,78 @@ export const resetPassword = async (req, res) => {
   }
 }
 
+// 搜尋管理者
+export const searchAdmins = async (req, res) => {
+  try {
+    const itemsPerPage = req.query.itemsPerPage * 1 || 10
+    const page = parseInt(req.query.page) || 1
+    let query = { role: UserRole.ADMIN }  // 固定只搜尋管理者
+
+    if (req.query.quickSearch) {
+      const searchQuery = [
+        { name: new RegExp(req.query.quickSearch, 'i') },
+        { adminId: new RegExp(req.query.quickSearch, 'i') },
+        { email: new RegExp(req.query.quickSearch, 'i') },
+        { note: new RegExp(req.query.quickSearch, 'i') }
+      ]
+      
+      query = {
+        $and: [
+          { role: UserRole.ADMIN },
+          { $or: searchQuery }
+        ]
+      }
+    }
+
+    const result = await User.find(query)
+      .sort({ [req.query.sortBy || 'adminId']: req.query.sortOrder === 'desc' ? -1 : 1 })
+      .skip((page - 1) * itemsPerPage)
+      .limit(itemsPerPage)
+
+    const total = await User.countDocuments(query)
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result: {
+        data: result,
+        totalItems: total,
+        itemsPerPage,
+        currentPage: page
+      }
+    })
+  } catch (error) {
+    handleError(res, error)
+  }
+}
+
+// 修改原本的 search 函數，專門用於搜尋一般使用者
 export const search = async (req, res) => {
   try {
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
     const page = parseInt(req.query.page) || 1
-    const query = {}
+    let query = {}
 
-    if (req.query.role) {
-      query.role = Number(req.query.role)
-    }
-
-    if (req.query.excludeRole === 'true') {
-      query.$or = [
-        { role: UserRole.USER },
-        { role: UserRole.MANAGER }
-      ]
-    }
+    // 使用 $or 來查詢多個特定角色值
+    query.$or = [
+      { role: UserRole.USER },
+      { role: UserRole.MANAGER }
+    ]
 
     if (req.query.quickSearch) {
       const searchQuery = [
         { name: new RegExp(req.query.quickSearch, 'i') },
         { userId: new RegExp(req.query.quickSearch, 'i') },
         { email: new RegExp(req.query.quickSearch, 'i') },
-        { note: new RegExp(req.query.quickSearch, 'i') },
-        { adminId: new RegExp(req.query.quickSearch, 'i') }
+        { note: new RegExp(req.query.quickSearch, 'i') }
       ]
       
-      if (query.$or) {
-        query.$and = [
-          { $or: query.$or },
+      // 組合搜尋條件
+      query = {
+        $and: [
+          { $or: [{ role: UserRole.USER }, { role: UserRole.MANAGER }] },
           { $or: searchQuery }
         ]
-        delete query.$or
-      } else {
-        query.$or = searchQuery
       }
     }
 

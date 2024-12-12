@@ -12,7 +12,8 @@ import {
   resetPassword,
   remove,
   getSuggestions,
-  search
+  search,
+  searchAdmins
 } from '../controllers/user.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
@@ -37,8 +38,8 @@ router.post('/', create)
 router.get('/all', getAll)
 router.get('/profile', auth.jwt, profile)
 router.get('/suggestions', auth.jwt, checkRole([UserRole.ADMIN]), getSuggestions)
-// router.get('/search', auth.jwt, checkRole([UserRole.ADMIN]), search)
-router.get('/search',search)
+router.get('/search/admins', auth.jwt, checkRole([UserRole.ADMIN]), searchAdmins)
+router.get('/search', auth.jwt, checkRole([UserRole.ADMIN]), search)
 
 // 用戶管理路由
 router.patch('/:id', auth.jwt, checkRole([UserRole.ADMIN]), edit)

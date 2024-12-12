@@ -31,6 +31,11 @@ const schema = new Schema({
     uppercase: true,
     set: v => (v === '' ? null : v)
   },
+  isActive: {
+    type: Boolean,
+    default: true,
+    required: true
+  },
   role: {
     type: Number,
     required: true,

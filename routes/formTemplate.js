@@ -23,7 +23,7 @@ router.get('/all',
 // 搜尋表單模板
 router.get('/search',
   auth.jwt,
-  checkRole([UserRole.ADMIN]),
+  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   search
 )
 
