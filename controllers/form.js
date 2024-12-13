@@ -198,6 +198,25 @@ export const search = async (req, res) => {
         }
       },
       { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          formNumber: 1,
+          clientName: 1,
+          projectName: 1,
+          pdfUrl: 1,
+          createdAt: 1,
+          formTemplate: {
+            _id: 1,
+            name: 1,
+            type: 1
+          },
+          creator: {
+            _id: 1,
+            name: 1,
+            userId: '$creator.adminId'
+          }
+        }
+      },
       { $sort: { [sortField]: sortOrder } },
       {
         $facet: {

@@ -354,7 +354,7 @@ export const forgotPassword = async (req, res) => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: user.email,
-      subject: '鋭皇國際 EIP - 密碼重置請求',
+      subject: '鋭皇數位行銷設計 EIP - 密碼重置請求',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 20px;">
@@ -378,7 +378,7 @@ export const forgotPassword = async (req, res) => {
           </div>
           
           <div style="text-align: center; margin-top: 30px;">
-            <p style="color: #666; margin-bottom: 20px;">GInternational System</p>
+            <p style="color: #666; margin-bottom: 20px;">GInternational EIP System</p>
             <img src="cid:logo" alt="GInternational Logo" style="max-width: 150px; height: auto;">
           </div>
 
