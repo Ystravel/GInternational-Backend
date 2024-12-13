@@ -213,7 +213,9 @@ export const search = async (req, res) => {
           creator: {
             _id: 1,
             name: 1,
-            userId: '$creator.adminId'
+            role: 1,
+            adminId: 1,
+            userId: 1
           }
         }
       },
