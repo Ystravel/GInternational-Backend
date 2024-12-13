@@ -349,7 +349,7 @@ export const forgotPassword = async (req, res) => {
     user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000) // 30分鐘後過期
     await user.save()
 
-    const resetUrl = `${process.env.FRONTEND_URL}/#/reset-password/${resetToken}`
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
@@ -366,7 +366,7 @@ export const forgotPassword = async (req, res) => {
             <p style="font-size: 14px; font-weight: 500">我們收到了您的密碼重置請求。請點擊下方連結重置您的密碼：</p>
             <div style="text-align: center; margin: 40px 0;">
               <a href="${resetUrl}" 
-                  style="background: #495866; color: white; padding: 12px 24px; 
+                  style="background: #AB47BC; color: white; padding: 12px 24px; 
                         text-decoration: none; letter-spacing:2px; font-size:14px; border-radius: 5px; display: inline-block;">
                 重置密碼
               </a>
@@ -407,14 +407,12 @@ export const forgotPassword = async (req, res) => {
 
 export const resetPassword = async (req, res) => {
   try {
-    const { token, newPassword } = req.body
+    const { resetPasswordToken: token, password: newPassword } = req.body
 
-    const user = await User.findOne({
-      resetPasswordToken: token,
-      resetPasswordExpires: { $gt: Date.now() }
-    })
+    // 先找到用戶
+    const user = await User.findOne({ resetPasswordToken: token })
 
-    if (!user) {
+    if (!user || !user.resetPasswordExpires || user.resetPasswordExpires < new Date()) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
         message: '重置連結無效或已過期'
