@@ -13,17 +13,10 @@ export const search = async (req, res) => {
     if (req.query.startDate && req.query.endDate) {
       const startDate = new Date(req.query.startDate)
       const endDate = new Date(req.query.endDate)
-      
-      // 確保日期範圍查詢是包含的
       query.createdAt = {
         $gte: startDate,
         $lte: endDate
       }
-      
-      console.log('Date query:', {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString()
-      })
     }
 
     // 處理操作類型篩選
@@ -31,38 +24,9 @@ export const search = async (req, res) => {
       query.action = req.query.action
     }
 
-    // 處理目標模型篩選（必須先有資料類型）
+    // 處理目標模型篩選
     if (req.query.targetModel) {
       query.targetModel = req.query.targetModel
-    }
-
-    // 處理操作對象篩選
-    if (req.query.targetId || req.query.targetName) {
-      if (req.query.targetModel === 'formTemplates') {
-        // 如果是表單模板，使用名稱搜尋
-        const searchText = req.query.targetName || req.query.targetId
-        if (typeof searchText === 'string') {
-          const searchRegex = new RegExp(searchText, 'i')
-          query['targetInfo.name'] = searchRegex
-        }
-      } else if (req.query.targetId) {
-        try {
-          const targetId = new mongoose.Types.ObjectId(req.query.targetId)
-          query.targetId = targetId
-        } catch (error) {
-          console.error('Invalid targetId:', error)
-          // 如果 ID 轉換失敗，可能是表單編號等其他識別符
-          if (req.query.targetModel === 'forms') {
-            query['targetInfo.formNumber'] = req.query.targetId
-          } else if (req.query.targetModel === 'users') {
-            // 如果是使用者，嘗試用 userId 或 adminId 搜尋
-            query.$or = [
-              { 'targetInfo.userId': req.query.targetId },
-              { 'targetInfo.adminId': req.query.targetId }
-            ]
-          }
-        }
-      }
     }
 
     // 處理操作者篩選
@@ -78,17 +42,22 @@ export const search = async (req, res) => {
       }
     }
 
-    // 處理快速搜尋
-    if (req.query.quickSearch) {
-      const searchRegex = new RegExp(req.query.quickSearch, 'i')
-      query.$or = [
-        { 'operatorInfo.name': searchRegex },
-        { 'operatorInfo.userId': searchRegex },
-        { 'targetInfo.name': searchRegex },
-        { 'targetInfo.userId': searchRegex },
-        { 'targetInfo.formNumber': searchRegex }
-      ]
+    // 處理操作對象篩選
+    if (req.query.targetId) {
+      try {
+        // 將字串轉換為 ObjectId
+        query.targetId = new mongoose.Types.ObjectId(req.query.targetId)
+        console.log('處理後的 targetId query:', query.targetId)
+      } catch (error) {
+        console.error('轉換 targetId 失敗:', error)
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '無效的目標 ID'
+        })
+      }
     }
+
+    console.log('最終查詢條件:', query)
 
     const pipeline = [
       { $match: query },
@@ -117,7 +86,6 @@ export const search = async (req, res) => {
           }
         }
       },
-      // 處理排序
       {
         $sort: req.query.sortBy
           ? { [req.query.sortBy]: parseInt(req.query.sortOrder) || -1 }
@@ -135,6 +103,8 @@ export const search = async (req, res) => {
     ]
 
     const [result] = await AuditLog.aggregate(pipeline)
+    console.log('查詢結果:', result)
+
     const totalItems = result.metadata[0]?.total || 0
 
     res.status(StatusCodes.OK).json({

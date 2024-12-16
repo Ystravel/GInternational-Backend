@@ -1,6 +1,7 @@
 import FormTemplate from '../models/formTemplate.js'
 import { StatusCodes } from 'http-status-codes'
 import { logCreate, logUpdate, logDelete } from '../services/auditLogService.js'
+import Form from '../models/form.js'
 
 // 創建表單模板
 export const create = async (req, res) => {
@@ -151,13 +152,26 @@ export const edit = async (req, res) => {
 // 刪除表單模板
 export const remove = async (req, res) => {
   try {
-    const result = await FormTemplate.findById(req.params.id)
-    if (!result) throw new Error('NOT FOUND')
+    // 先檢查表單模板是否存在
+    const template = await FormTemplate.findById(req.params.id)
+    if (!template) {
+      throw new Error('NOT_FOUND')
+    }
+
+    // 檢查是否有表單正在使用此模板
+    const usedByForms = await Form.exists({ formTemplate: req.params.id })
+    if (usedByForms) {
+      return res.status(StatusCodes.CONFLICT).json({
+        success: false,
+        message: '此表單模板正在被使用中，無法刪除'
+      })
+    }
 
     // 記錄審計日誌
-    await logDelete(req.user, result, 'formTemplates')
+    await logDelete(req.user, template, 'formTemplates')
 
-    await result.deleteOne()
+    // 執行刪除
+    await template.deleteOne()
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -169,12 +183,13 @@ export const remove = async (req, res) => {
         success: false,
         message: '表單模板 ID 格式錯誤'
       })
-    } else if (error.message === 'NOT FOUND') {
+    } else if (error.message === 'NOT_FOUND') {
       res.status(StatusCodes.NOT_FOUND).json({
         success: false,
         message: '找不到表單模板'
       })
     } else {
+      console.error('刪除表單模板失敗:', error)
       res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
         success: false,
         message: '未知錯誤'
@@ -244,33 +259,28 @@ export const search = async (req, res) => {
 // 新增表單模板搜尋建議
 export const getSuggestions = async (req, res) => {
   try {
-    const { search } = req.query
-    if (!search) {
-      return res.status(StatusCodes.OK).json({
-        success: true,
-        result: []
-      })
-    }
-
+    const search = req.query.search || ''
     const searchRegex = new RegExp(search, 'i')
-    const query = {
-      name: searchRegex
-    }
 
-    const templates = await FormTemplate.find(query)
-      .select('_id name')
-      .limit(10)
-      .lean()
+    const suggestions = await FormTemplate.find({
+      $or: [
+        { name: searchRegex },
+        { type: searchRegex }
+      ]
+    })
+    .select('_id name type')
+    .limit(10)
 
     res.status(StatusCodes.OK).json({
       success: true,
-      result: templates
+      message: '',
+      result: suggestions
     })
   } catch (error) {
-    console.error('取得表單模板建議失敗:', error)
+    console.error('取得表單模板失敗:', error)
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
-      message: '取得表單模板建議失敗'
+      message: '取得表單模板失敗'
     })
   }
 }

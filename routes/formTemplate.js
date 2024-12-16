@@ -28,6 +28,13 @@ router.get('/search',
   search
 )
 
+// 新增表單模板搜尋建議路由
+router.get('/suggestions',
+  auth.jwt,
+  checkRole([UserRole.ADMIN]),
+  getSuggestions
+)
+
 // 創建表單模板
 router.post('/',
   auth.jwt,
@@ -54,13 +61,6 @@ router.get('/:id',
   auth.jwt,
   checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   getById
-)
-
-// 新增表單模板搜尋建議路由
-router.get('/suggestions',
-  auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
-  getSuggestions
 )
 
 export default router
