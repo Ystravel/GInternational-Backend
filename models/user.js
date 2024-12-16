@@ -39,7 +39,7 @@ const schema = new Schema({
   role: {
     type: Number,
     required: true,
-    default: UserRole.USER  // 改回 0，對應一般員工
+    default: UserRole.USER  // 改回 0，對應一般使用者
   },
   note: {
     type: String
