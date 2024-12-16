@@ -4,6 +4,7 @@ import FormTemplate from '../models/formTemplate.js'
 import mongoose from 'mongoose'
 import path from 'path'
 import fs from 'fs'
+import { logCreate, logUpdate, logDelete } from '../services/auditLogService.js'
 
 // 取得下一個表單編號
 export const getNextNumber = async (req, res) => {
@@ -79,6 +80,12 @@ export const create = async (req, res) => {
       pdfUrl: req.body.pdfUrl,
       projectName: req.body.projectName
     })
+
+    // 記錄審計日誌
+    await logCreate(req.user, {
+      ...result.toObject(),
+      formNumber: result.formNumber
+    }, 'forms')
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -260,8 +267,13 @@ export const remove = async (req, res) => {
   try {
     const result = await Form.findById(req.params.id)
     if (!result) throw new Error('NOT_FOUND')
-    // // 從 PDF URL 中提取 public_id
-    //     const publicId = result.pdfUrl.split('/').slice(-2).join('/')
+
+    // 記錄審計日誌
+    await logDelete(req.user, {
+      ...result.toObject(),
+      formNumber: result.formNumber
+    }, 'forms')
+
     // 從 URL 中提取檔案名稱
     const filename = path.basename(result.pdfUrl)
     const filePath = path.join(process.env.UPLOAD_PATH, 'forms', filename)
@@ -276,7 +288,6 @@ export const remove = async (req, res) => {
     }
 
     await result.deleteOne()
-
 
     res.status(StatusCodes.OK).json({
       success: true,

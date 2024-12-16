@@ -1,5 +1,6 @@
 import FormTemplate from '../models/formTemplate.js'
 import { StatusCodes } from 'http-status-codes'
+import { logCreate, logUpdate, logDelete } from '../services/auditLogService.js'
 
 // 創建表單模板
 export const create = async (req, res) => {
@@ -23,6 +24,9 @@ export const create = async (req, res) => {
       type: req.body.type,
       componentName: req.body.componentName
     })
+
+    // 記錄審計日誌
+    await logCreate(req.user, result, 'formTemplates')
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -109,6 +113,8 @@ export const edit = async (req, res) => {
       { new: true, runValidators: true }
     )
 
+    // 記錄審計日誌
+    await logUpdate(req.user, result, 'formTemplates', original.toObject(), req.body)
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -147,6 +153,9 @@ export const remove = async (req, res) => {
   try {
     const result = await FormTemplate.findById(req.params.id)
     if (!result) throw new Error('NOT FOUND')
+
+    // 記錄審計日誌
+    await logDelete(req.user, result, 'formTemplates')
 
     await result.deleteOne()
 

@@ -32,12 +32,10 @@ router.post('/forgot-password', forgotPassword)
 router.post('/reset-password', resetPassword)
 
 // 用戶資料相關路由
-// router.post('/', auth.jwt, checkRole([UserRole.ADMIN]), create)
-router.post('/', create)
-// router.get('/all', auth.jwt, checkRole([UserRole.ADMIN]), getAll)
-router.get('/all', getAll)
+router.post('/', auth.jwt, checkRole([UserRole.ADMIN]), create)
+router.get('/all', auth.jwt, checkRole([UserRole.ADMIN]), getAll)
 router.get('/profile', auth.jwt, profile)
-router.get('/suggestions', auth.jwt, checkRole([UserRole.ADMIN]), getSuggestions)
+router.get('/suggestions', auth.jwt, getSuggestions)
 router.get('/search/admins', auth.jwt, checkRole([UserRole.ADMIN]), searchAdmins)
 router.get('/search', auth.jwt, checkRole([UserRole.ADMIN]), search)
 

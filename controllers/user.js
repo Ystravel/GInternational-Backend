@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url'
 import path, { dirname } from 'path'
 import { getNextUserNumber, getNextAdminNumber } from '../utils/sequence.js'
 import UserRole from '../enums/UserRole.js'
+import { logCreate, logUpdate, logDelete } from '../services/auditLogService.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -47,6 +48,8 @@ export const create = async (req, res) => {
     const result = await User.create({
       ...req.body
     })
+
+    await logCreate(req.user, result, 'users')
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -215,12 +218,13 @@ export const getSuggestions = async (req, res) => {
       $or: [
         { name: searchRegex },
         { userId: searchRegex },
+        { adminId: searchRegex },
         { email: searchRegex }
       ]
     }
 
     const users = await User.find(query)
-      .select('name userId email')
+      .select('name userId adminId email role')
       .limit(10)
 
     res.status(StatusCodes.OK).json({
@@ -254,6 +258,8 @@ export const remove = async (req, res) => {
     if (!user) {
       throw new Error('NOT FOUND')
     }
+
+    await logDelete(req.user || null, user, 'users')
 
     await user.deleteOne()
 
@@ -312,15 +318,18 @@ export const edit = async (req, res) => {
       })
     }
 
+    const originalUser = await User.findById(req.params.id)
+    if (!originalUser) {
+      throw new Error('NOT FOUND')
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true, runValidators: true }
     )
 
-    if (!updatedUser) {
-      throw new Error('NOT FOUND')
-    }
+    await logUpdate(req.user || null, updatedUser, 'users', originalUser.toObject(), updateData)
 
     res.status(StatusCodes.OK).json({
       success: true,

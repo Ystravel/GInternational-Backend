@@ -9,6 +9,7 @@ import mongoSanitize from 'express-mongo-sanitize'
 import routeUser from './routes/user.js'
 import routeFormTemplate from './routes/formTemplate.js'
 import routeForm from './routes/form.js'
+import routeAuditLog from './routes/auditLog.js'
 
 // passport
 import './passport/passport.js'
@@ -34,6 +35,7 @@ app.use('/uploads', express.static(process.env.UPLOAD_PATH))
 app.use('/user', routeUser)
 app.use('/formTemplates', routeFormTemplate)
 app.use('/forms', routeForm)
+app.use('/auditLogs', routeAuditLog)
 
 app.all('*', (req, res) => {
   res.status(StatusCodes.NOT_FOUND).json({
