@@ -240,3 +240,37 @@ export const search = async (req, res) => {
     })
   }
 }
+
+// 新增表單模板搜尋建議
+export const getSuggestions = async (req, res) => {
+  try {
+    const { search } = req.query
+    if (!search) {
+      return res.status(StatusCodes.OK).json({
+        success: true,
+        result: []
+      })
+    }
+
+    const searchRegex = new RegExp(search, 'i')
+    const query = {
+      name: searchRegex
+    }
+
+    const templates = await FormTemplate.find(query)
+      .select('_id name')
+      .limit(10)
+      .lean()
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      result: templates
+    })
+  } catch (error) {
+    console.error('取得表單模板建議失敗:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '取得表單模板建議失敗'
+    })
+  }
+}

@@ -343,3 +343,40 @@ export const uploadPDF = async (req, res) => {
     })
   }
 }
+
+// 新增表單搜尋建議
+export const getSuggestions = async (req, res) => {
+  try {
+    const { search } = req.query
+    if (!search) {
+      return res.status(StatusCodes.OK).json({
+        success: true,
+        result: []
+      })
+    }
+
+    const searchRegex = new RegExp(search, 'i')
+    const query = {
+      $or: [
+        { formNumber: searchRegex },
+        { clientName: searchRegex }
+      ]
+    }
+
+    const forms = await Form.find(query)
+      .select('_id formNumber clientName')
+      .limit(10)
+      .lean()
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      result: forms
+    })
+  } catch (error) {
+    console.error('取得表單建議失敗:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '取得表單建議失敗'
+    })
+  }
+}

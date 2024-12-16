@@ -5,7 +5,8 @@ import {
   edit,
   remove,
   getById,
-  search
+  search,
+  getSuggestions
 } from '../controllers/formTemplate.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
@@ -53,6 +54,13 @@ router.get('/:id',
   auth.jwt,
   checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   getById
+)
+
+// 新增表單模板搜尋建議路由
+router.get('/suggestions',
+  auth.jwt,
+  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
+  getSuggestions
 )
 
 export default router

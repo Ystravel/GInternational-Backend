@@ -31,9 +31,38 @@ export const search = async (req, res) => {
       query.action = req.query.action
     }
 
-    // 處理目標模型篩選
+    // 處理目標模型篩選（必須先有資料類型）
     if (req.query.targetModel) {
       query.targetModel = req.query.targetModel
+    }
+
+    // 處理操作對象篩選
+    if (req.query.targetId || req.query.targetName) {
+      if (req.query.targetModel === 'formTemplates') {
+        // 如果是表單模板，使用名稱搜尋
+        const searchText = req.query.targetName || req.query.targetId
+        if (typeof searchText === 'string') {
+          const searchRegex = new RegExp(searchText, 'i')
+          query['targetInfo.name'] = searchRegex
+        }
+      } else if (req.query.targetId) {
+        try {
+          const targetId = new mongoose.Types.ObjectId(req.query.targetId)
+          query.targetId = targetId
+        } catch (error) {
+          console.error('Invalid targetId:', error)
+          // 如果 ID 轉換失敗，可能是表單編號等其他識別符
+          if (req.query.targetModel === 'forms') {
+            query['targetInfo.formNumber'] = req.query.targetId
+          } else if (req.query.targetModel === 'users') {
+            // 如果是使用者，嘗試用 userId 或 adminId 搜尋
+            query.$or = [
+              { 'targetInfo.userId': req.query.targetId },
+              { 'targetInfo.adminId': req.query.targetId }
+            ]
+          }
+        }
+      }
     }
 
     // 處理操作者篩選

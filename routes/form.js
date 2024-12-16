@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { create, search, remove, uploadPDF, getNextNumber } from '../controllers/form.js'
+import { create, search, remove, uploadPDF, getNextNumber, getSuggestions } from '../controllers/form.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
 import UserRole from '../enums/UserRole.js'
@@ -36,6 +36,12 @@ router.get('/next-number',
   auth.jwt,
   checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   getNextNumber
+)
+
+router.get('/suggestions',
+  auth.jwt,
+  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
+  getSuggestions
 )
 
 export default router
