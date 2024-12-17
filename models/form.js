@@ -5,12 +5,6 @@ const formSchema = new Schema({
     type: String,
     required: [true, '請輸入表單編號']
   },
-  clientName: {
-    type: String
-  },
-  projectName: {
-    type: String
-  },
   formTemplate: {
     type: Schema.Types.ObjectId,
     ref: 'formTemplates',
@@ -24,6 +18,12 @@ const formSchema = new Schema({
   pdfUrl: {
     type: String,
     required: [true, '請上傳 PDF 檔案']
+  },
+  // 使用 Mixed 型別儲存不同表單的資料
+  formData: {
+    type: Schema.Types.Mixed,
+    default: {},
+    required: [true, '請填寫表單資料']
   }
 }, {
   timestamps: true

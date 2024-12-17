@@ -6,47 +6,10 @@ import path from 'path'
 import fs from 'fs'
 import { logCreate, logUpdate, logDelete } from '../services/auditLogService.js'
 
-// 取得下一個表單編號
-export const getNextNumber = async (req, res) => {
-  try {
-    const today = new Date()
-    const currentDate = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-    const currentMonth = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}`
-
-    // 查找當月最大的流水號
-    const latestForm = await Form.findOne({
-      formNumber: new RegExp(`^${currentMonth}`)
-    }).sort({ formNumber: -1 })
-
-    let nextNumber
-    if (latestForm) {
-      // 如果當月有資料，取最後4位數字(流水號)加1
-      const currentSeq = parseInt(latestForm.formNumber.slice(-4))
-      nextNumber = `${currentDate}${String(currentSeq + 1).padStart(4, '0')}`
-    } else {
-      // 如果當月沒有資料，從0001開始
-      nextNumber = `${currentDate}0001`
-    }
-
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: '',
-      result: nextNumber
-    })
-  } catch (error) {
-    console.error('取得表單編號失敗:', error)
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-      success: false,
-      message: '取得表單編號失敗'
-    })
-  }
-}
 
 // 創建表單
 export const create = async (req, res) => {
   try {
-    console.log('收到創建請求')
-    console.log('請求資料:', req.body)
 
     // 1. 先檢查單號是否重複
     const existingForm = await Form.findOne({ formNumber: req.body.formNumber })
@@ -58,7 +21,6 @@ export const create = async (req, res) => {
         try {
           if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath)
-            console.log('已刪除重複單號的 PDF 檔案:', filePath)
           }
         } catch (error) {
           console.error('刪除 PDF 檔案失敗:', error)
@@ -74,11 +36,12 @@ export const create = async (req, res) => {
     // 2. 創建表單
     const result = await Form.create({
       formNumber: req.body.formNumber,
-      clientName: req.body.clientName,
       formTemplate: req.body.formTemplate,
       creator: req.user._id,
       pdfUrl: req.body.pdfUrl,
-      projectName: req.body.projectName
+      formData: {
+        ...req.body.formData // 展開所有其他欄位
+      }
     })
 
     // 記錄審計日誌
@@ -100,7 +63,6 @@ export const create = async (req, res) => {
       try {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath)
-          console.log('已刪除失敗的 PDF 檔案:', filePath)
         }
       } catch (deleteError) {
         console.error('刪除 PDF 檔案失敗:', deleteError)
@@ -176,8 +138,12 @@ export const search = async (req, res) => {
       const searchRegex = new RegExp(req.query.quickSearch, 'i')
       query.$or = [
         { formNumber: searchRegex },
-        { clientName: searchRegex },
-        { projectName: searchRegex }
+        { 'formData.customerName': searchRegex },
+        { 'formData.projectName': searchRegex },
+        // 添加對表單項目的搜尋
+        { 'formData.items.name': searchRegex },      // 銳皇報價單的項目名稱
+        { 'formData.items.category': searchRegex },  // 永信旅遊報價單的項目類別
+        { 'formData.items.description': searchRegex } // 兩種報價單都有的項目說明
       ]
     }
 
@@ -208,8 +174,8 @@ export const search = async (req, res) => {
       {
         $project: {
           formNumber: 1,
-          clientName: 1,
-          projectName: 1,
+          clientName: '$formData.customerName',
+          projectName: '$formData.projectName',
           pdfUrl: 1,
           createdAt: 1,
           formTemplate: {
@@ -248,16 +214,15 @@ export const search = async (req, res) => {
       result: {
         data: result.data,
         totalItems,
-        itemsPerPage,
-        currentPage: page
+        currentPage: page,
+        totalPages: Math.ceil(totalItems / itemsPerPage)
       }
     })
   } catch (error) {
-    console.error('搜尋失敗，錯誤:', error)
+    console.error('搜尋失敗:', error)
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
-      message: '搜尋失敗',
-      error: error.message
+      message: '搜尋失敗'
     })
   }
 }
@@ -313,20 +278,13 @@ export const remove = async (req, res) => {
 // 上傳 PDF
 export const uploadPDF = async (req, res) => {
   try {
-    console.log('收到上傳請求')
-    console.log('檔案資訊:', req.file)
     if (!req.file) {
-      console.log('沒有收到檔案')
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
         message: '請上傳 PDF 檔案'
       })
     }
 
-    console.log('上傳成功，傳資訊:', {
-      url: req.file.path,
-      filename: req.file.filename
-    })
     res.status(StatusCodes.OK).json({
       success: true,
       message: 'PDF 上傳成功',
@@ -377,6 +335,88 @@ export const getSuggestions = async (req, res) => {
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: '取得表單建議失敗'
+    })
+  }
+}
+
+// 取得銳皇報價單的下一個單號
+export const getRayHuangQuotationNextNumber = async (req, res) => {
+  try {
+    const today = new Date()
+    const currentYear = today.getFullYear()
+    const currentMonth = String(today.getMonth() + 1).padStart(2, '0')
+    const currentDay = String(today.getDate()).padStart(2, '0')
+    const currentDate = `${currentYear}${currentMonth}${currentDay}`
+
+    // 查找當天最大的流水號
+    const latestForm = await Form.findOne({
+      formNumber: new RegExp(`^${currentDate}`),
+      formTemplate: req.query.templateId
+    }).sort({ formNumber: -1 })
+
+    let nextNumber
+    if (latestForm) {
+      // 如果當天有資料，取最後4位數字(流水號)加1
+      const currentSeq = parseInt(latestForm.formNumber.slice(-4))
+      nextNumber = `${currentDate}${String(currentSeq + 1).padStart(4, '0')}`
+    } else {
+      // 如果當天沒有資料，從0001開始
+      nextNumber = `${currentDate}0001`
+    }
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result: nextNumber
+    })
+  } catch (error) {
+    console.error('取得銳皇報價單單號失敗:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '取得單號失敗'
+    })
+  }
+}
+
+export const getYstravelQuotationNextNumber = async (req, res) => {
+  try {
+    const { templateId } = req.query
+    if (!templateId) {
+      throw new Error('缺少必要參數')
+    }
+
+    // 取得當前年月
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const prefix = `YST${year}${month}`
+
+    // 找出最後一個單號
+    const lastForm = await Form.findOne({
+      formNumber: new RegExp(`^${prefix}`),
+      formTemplate: templateId
+    }).sort({ formNumber: -1 })
+
+    let nextNumber = 1
+    if (lastForm) {
+      // 從最後一個單號取得序號並加1
+      const lastNumber = parseInt(lastForm.formNumber.slice(-3))
+      nextNumber = lastNumber + 1
+    }
+
+    // 組合新單號 (YST + 年 + 月 + 3位數序號)
+    const formNumber = `${prefix}${String(nextNumber).padStart(3, '0')}`
+
+    res.status(200).json({
+      success: true,
+      message: '取得下一個單號成功',
+      result: formNumber
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: '取得下一個單號失敗',
+      error: error.message
     })
   }
 }

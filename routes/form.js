@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { create, search, remove, uploadPDF, getNextNumber, getSuggestions } from '../controllers/form.js'
+import { create, search, remove, uploadPDF, getSuggestions, getRayHuangQuotationNextNumber, getYstravelQuotationNextNumber } from '../controllers/form.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
 import UserRole from '../enums/UserRole.js'
@@ -32,10 +32,16 @@ router.post('/upload/pdf',
   uploadPDF
 )
 
-router.get('/next-number',
+router.get('/ray-huang-quotation/next-number',
   auth.jwt,
   checkRole([UserRole.ADMIN, UserRole.MANAGER]),
-  getNextNumber
+  getRayHuangQuotationNextNumber
+)
+
+router.get('/ystravel-quotation/next-number',
+  auth.jwt,
+  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
+  getYstravelQuotationNextNumber
 )
 
 router.get('/suggestions',
