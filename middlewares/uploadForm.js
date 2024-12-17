@@ -26,9 +26,9 @@ const storage = multer.diskStorage({
     cb(null, uploadPath)
   },
   filename: function (req, file, cb) {
-    // 生成檔案名稱: 時間戳_原始檔名
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-    cb(null, uniqueSuffix + path.extname(file.originalname))
+    // 使用原始檔案名稱，但加上時間戳前綴以避免衝突
+    const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0]
+    cb(null, file.originalname)
   }
 })
 
