@@ -26,9 +26,9 @@ const storage = multer.diskStorage({
     cb(null, uploadPath)
   },
   filename: function (req, file, cb) {
-    // 使用原始檔案名稱，但加上時間戳前綴以避免衝突
-    const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0]
-    cb(null, file.originalname)
+    const timestamp = Date.now()
+    const quotationNumber = file.originalname.split('_')[1].replace('.pdf', '') // 取得單號部分
+    cb(null, `${quotationNumber}_${timestamp}.pdf`)
   }
 })
 
