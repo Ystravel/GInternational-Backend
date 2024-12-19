@@ -10,6 +10,11 @@ import routeUser from './routes/user.js'
 import routeFormTemplate from './routes/formTemplate.js'
 import routeForm from './routes/form.js'
 import routeAuditLog from './routes/auditLog.js'
+import routeMarketingTheme from './routes/marketing/theme.js'
+import routeMarketingCategory from './routes/marketing/category.js'
+import routeMarketingBudget from './routes/marketing/budget.js'
+import routeMarketingExpense from './routes/marketing/expense.js'
+
 
 // passport
 import './passport/passport.js'
@@ -36,6 +41,10 @@ app.use('/user', routeUser)
 app.use('/formTemplates', routeFormTemplate)
 app.use('/forms', routeForm)
 app.use('/auditLogs', routeAuditLog)
+app.use('/marketing/themes', routeMarketingTheme)
+app.use('/marketing/categories', routeMarketingCategory)
+app.use('/marketing/budgets', routeMarketingBudget)
+app.use('/marketing/expenses', routeMarketingExpense)
 
 app.all('*', (req, res) => {
   res.status(StatusCodes.NOT_FOUND).json({
