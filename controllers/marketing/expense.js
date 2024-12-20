@@ -1,10 +1,9 @@
 import { StatusCodes } from 'http-status-codes'
 import Expense from '../../models/marketing/expense.js'
-import Budget from '../../models/marketing/budget.js'
 import validator from 'validator'
 import { logCreate, logUpdate, logDelete } from '../../services/auditLogService.js'
 
-// 創建實際花費表
+// 創建實際花費
 export const create = async (req, res) => {
   try {
     const result = await Expense.create({
@@ -17,7 +16,7 @@ export const create = async (req, res) => {
 
     res.status(StatusCodes.OK).json({
       success: true,
-      message: '實際花費表創建成功',
+      message: '實際花費創建成功',
       result
     })
   } catch (error) {
@@ -25,7 +24,7 @@ export const create = async (req, res) => {
   }
 }
 
-// 取得實際花費表列表
+// 取得實際花費列表
 export const getAll = async (req, res) => {
   try {
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
@@ -42,21 +41,40 @@ export const getAll = async (req, res) => {
       query.theme = req.query.theme
     }
 
-    // 處理狀態篩選
-    if (req.query.status) {
-      query.status = req.query.status
+    // 處理渠道篩選
+    if (req.query.channel && validator.isMongoId(req.query.channel)) {
+      query.channel = req.query.channel
+    }
+
+    // 處理平台篩選
+    if (req.query.platform && validator.isMongoId(req.query.platform)) {
+      query.platform = req.query.platform
+    }
+
+    // 處理日期範圍篩選
+    if (req.query.startDate && req.query.endDate) {
+      query.invoiceDate = {
+        $gte: new Date(req.query.startDate),
+        $lte: new Date(req.query.endDate)
+      }
+    }
+
+    // 處理關鍵字搜尋
+    if (req.query.search) {
+      query.$or = [
+        { note: { $regex: req.query.search, $options: 'i' } }
+      ]
     }
 
     const result = await Expense.find(query)
       .populate('theme', 'name')
-      .populate('relatedBudget')
+      .populate('channel', 'name')
+      .populate('platform', 'name')
+      .populate('detail', 'name')
+      .populate('relatedBudget', 'year theme')
       .populate('creator', 'name')
       .populate('lastModifier', 'name')
-      .populate('items.channel', 'name')
-      .populate('items.platform', 'name')
-      .populate('items.project', 'name')
-      .populate('items.detail', 'name')
-      .sort({ year: -1, createdAt: -1 })
+      .sort({ invoiceDate: -1, createdAt: -1 })
       .skip((page - 1) * itemsPerPage)
       .limit(itemsPerPage)
 
@@ -77,20 +95,19 @@ export const getAll = async (req, res) => {
   }
 }
 
-// 取得單一實際花費表
+// 取得單一實際花費
 export const getById = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error('ID')
 
     const result = await Expense.findById(req.params.id)
       .populate('theme', 'name')
-      .populate('relatedBudget')
+      .populate('channel', 'name')
+      .populate('platform', 'name')
+      .populate('detail', 'name')
+      .populate('relatedBudget', 'year theme')
       .populate('creator', 'name')
       .populate('lastModifier', 'name')
-      .populate('items.channel', 'name')
-      .populate('items.platform', 'name')
-      .populate('items.project', 'name')
-      .populate('items.detail', 'name')
 
     if (!result) throw new Error('NOT_FOUND')
 
@@ -104,7 +121,7 @@ export const getById = async (req, res) => {
   }
 }
 
-// 編輯實際花費表
+// 編輯實際花費
 export const edit = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error('ID')
@@ -119,30 +136,24 @@ export const edit = async (req, res) => {
       throw new Error('NOT_FOUND')
     }
 
-    // 如果狀態是已發布，就不能修改
-    if (originalExpense.status === 'published') {
-      throw new Error('PUBLISHED')
-    }
-
     const updatedExpense = await Expense.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true, runValidators: true }
     )
       .populate('theme', 'name')
-      .populate('relatedBudget')
+      .populate('channel', 'name')
+      .populate('platform', 'name')
+      .populate('detail', 'name')
+      .populate('relatedBudget', 'year theme')
       .populate('creator', 'name')
       .populate('lastModifier', 'name')
-      .populate('items.channel', 'name')
-      .populate('items.platform', 'name')
-      .populate('items.project', 'name')
-      .populate('items.detail', 'name')
 
     await logUpdate(req.user, updatedExpense, 'marketingExpenses', originalExpense.toObject(), updateData)
 
     res.status(StatusCodes.OK).json({
       success: true,
-      message: '實際花費表更新成功',
+      message: '實際花費更新成功',
       result: updatedExpense
     })
   } catch (error) {
@@ -150,7 +161,7 @@ export const edit = async (req, res) => {
   }
 }
 
-// 刪除實際花費表
+// 刪除實際花費
 export const remove = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error('ID')
@@ -160,86 +171,39 @@ export const remove = async (req, res) => {
       throw new Error('NOT_FOUND')
     }
 
-    // 如果狀態是已發布，就不能刪除
-    if (expense.status === 'published') {
-      throw new Error('PUBLISHED')
-    }
-
     await logDelete(req.user, expense, 'marketingExpenses')
     await expense.deleteOne()
 
     res.status(StatusCodes.OK).json({
       success: true,
-      message: '實際花費表刪除成功'
+      message: '實際花費刪除成功'
     })
   } catch (error) {
     handleError(res, error)
   }
 }
 
-// 發布實際花費表
-export const publish = async (req, res) => {
+// 取得月度統計
+export const getMonthlyStats = async (req, res) => {
   try {
-    if (!validator.isMongoId(req.params.id)) throw new Error('ID')
+    const { year, month, theme, channel, platform } = req.query
 
-    const expense = await Expense.findById(req.params.id)
-    if (!expense) {
-      throw new Error('NOT_FOUND')
+    if (!year || !month || !theme) {
+      throw new Error('PARAMS_REQUIRED')
     }
 
-    if (expense.status === 'published') {
-      throw new Error('ALREADY_PUBLISHED')
-    }
-
-    const updateData = {
-      status: 'published',
-      lastModifier: req.user._id
-    }
-
-    const updatedExpense = await Expense.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
+    const total = await Expense.getMonthlyTotal(
+      parseInt(year),
+      parseInt(month),
+      theme,
+      channel,
+      platform
     )
-      .populate('theme', 'name')
-      .populate('relatedBudget')
-      .populate('creator', 'name')
-      .populate('lastModifier', 'name')
-      .populate('items.channel', 'name')
-      .populate('items.platform', 'name')
-      .populate('items.project', 'name')
-      .populate('items.detail', 'name')
-
-    await logUpdate(req.user, updatedExpense, 'marketingExpenses', expense.toObject(), updateData)
-
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: '實際花費表發布成功',
-      result: updatedExpense
-    })
-  } catch (error) {
-    handleError(res, error)
-  }
-}
-
-// 取得可關聯的預算表
-export const getBudgetOptions = async (req, res) => {
-  try {
-    const { year, theme } = req.query
-    if (!year || !theme) throw new Error('PARAMS_REQUIRED')
-
-    const budgets = await Budget.find({
-      year: parseInt(year),
-      theme: theme,
-      status: 'published'
-    })
-      .select('year theme')
-      .populate('theme', 'name')
 
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
-      result: budgets
+      result: { total }
     })
   } catch (error) {
     handleError(res, error)
@@ -259,17 +223,10 @@ const handleError = (res, error) => {
     })
   }
 
-  if (error.code === 11000) {
-    return res.status(StatusCodes.BAD_REQUEST).json({
-      success: false,
-      message: '該年度的實際花費表已存在'
-    })
-  }
-
   if (error.message === 'NOT_FOUND') {
     return res.status(StatusCodes.NOT_FOUND).json({
       success: false,
-      message: '找不到實際花費表'
+      message: '找不到實際花費記錄'
     })
   }
 
@@ -280,24 +237,10 @@ const handleError = (res, error) => {
     })
   }
 
-  if (error.message === 'PUBLISHED') {
-    return res.status(StatusCodes.BAD_REQUEST).json({
-      success: false,
-      message: '已發布的實際花費表不能修改'
-    })
-  }
-
-  if (error.message === 'ALREADY_PUBLISHED') {
-    return res.status(StatusCodes.BAD_REQUEST).json({
-      success: false,
-      message: '實際花費表已經發布'
-    })
-  }
-
   if (error.message === 'PARAMS_REQUIRED') {
     return res.status(StatusCodes.BAD_REQUEST).json({
       success: false,
-      message: '請提供年度和主題'
+      message: '請提供必要的參數'
     })
   }
 

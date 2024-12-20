@@ -19,7 +19,7 @@ const auditLogSchema = new Schema({
   },
   targetModel: {
     type: String,
-    enum: ['users', 'formTemplates', 'forms', 'marketingCategories', 'marketingThemes', 'marketingBudgets', 'marketingExpenses'],
+    enum: ['users', 'formTemplates', 'forms', 'marketingCategories', 'marketingBudgets', 'marketingExpenses'],
     required: true
   },
   operatorInfo: {

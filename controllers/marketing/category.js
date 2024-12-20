@@ -27,38 +27,53 @@ export const create = async (req, res) => {
 // 取得所有廣告類別
 export const getAll = async (req, res) => {
   try {
-    const itemsPerPage = req.query.itemsPerPage * 1 || 10
-    const page = parseInt(req.query.page) || 1
-    const query = {}
-
-    // 處理類型篩選
-    if (req.query.type) {
-      query.type = parseInt(req.query.type)
+    const itemsPerPage = 15 // 固定每頁 20 筆
+    const pages = {
+      0: parseInt(req.query.page0) || 1,
+      1: parseInt(req.query.page1) || 1,
+      2: parseInt(req.query.page2) || 1,
+      3: parseInt(req.query.page3) || 1
     }
 
-    // 處理啟用狀態篩選
-    if (req.query.isActive !== undefined) {
-      query.isActive = req.query.isActive === 'true'
+    // 基本查詢條件
+    let baseQuery = {}
+    if (req.query.quickSearch) {
+      baseQuery.name = new RegExp(req.query.quickSearch, 'i')
     }
 
-    const result = await Category.find(query)
-      .populate('creator', 'name')
-      .populate('lastModifier', 'name')
-      .sort({ [req.query.sortBy || 'order']: req.query.sortOrder === 'desc' ? -1 : 1 })
-      .skip((page - 1) * itemsPerPage)
-      .limit(itemsPerPage)
+    // 取得每種類型的資料
+    const results = await Promise.all([0, 1, 2, 3].map(async type => {
+      const query = { ...baseQuery, type }
+      const data = await Category.find(query)
+        .populate('creator', 'name')
+        .populate('lastModifier', 'name')
+        .sort({ order: 1 })
+        .skip((pages[type] - 1) * itemsPerPage)
+        .limit(itemsPerPage)
 
-    const total = await Category.countDocuments(query)
+      const total = await Category.countDocuments(query)
+
+      return {
+        type,
+        data,
+        total,
+        currentPage: pages[type],
+        totalPages: Math.ceil(total / itemsPerPage)
+      }
+    }))
+
+    // 組合回傳資料
+    const result = {
+      marketingThemes: results[0],
+      advertisingChannels: results[1],
+      platforms: results[2],
+      details: results[3]
+    }
 
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
-      result: {
-        data: result,
-        totalItems: total,
-        itemsPerPage,
-        currentPage: page
-      }
+      result
     })
   } catch (error) {
     handleError(res, error)
@@ -167,7 +182,7 @@ const handleError = (res, error) => {
   if (error.message === 'NOT_FOUND') {
     return res.status(StatusCodes.NOT_FOUND).json({
       success: false,
-      message: '找不到廣告類別'
+      message: '找不到廣告類���'
     })
   }
 

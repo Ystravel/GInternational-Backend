@@ -1,4 +1,4 @@
-import { Schema, model } from 'mongoose'
+import { Schema, model, ObjectId } from 'mongoose'
 
 const monthlyBudgetSchema = new Schema({
   JAN: { type: Number, default: 0 },
@@ -14,19 +14,26 @@ const monthlyBudgetSchema = new Schema({
   NOV: { type: Number, default: 0 },
   DEC: { type: Number, default: 0 }
 }, {
-  _id: false
+  _id: false,
+  virtuals: {
+    total: {
+      get() {
+        return Object.values(this).reduce((sum, value) => sum + (typeof value === 'number' ? value : 0), 0)
+      }
+    }
+  }
 })
 
 const budgetItemSchema = new Schema({
   // 廣告渠道
   channel: {
-    type: Schema.Types.ObjectId,
+    type: ObjectId,
     ref: 'marketingCategories',
     required: [true, '請選擇廣告渠道']
   },
   // 平台
   platform: {
-    type: Schema.Types.ObjectId,
+    type: ObjectId,
     ref: 'marketingCategories',
     required: [true, '請選擇平台']
   },
@@ -36,7 +43,14 @@ const budgetItemSchema = new Schema({
     required: [true, '請填寫預算']
   }
 }, {
-  _id: false
+  _id: false,
+  virtuals: {
+    total: {
+      get() {
+        return this.monthlyBudget.total
+      }
+    }
+  }
 })
 
 const budgetSchema = new Schema({
@@ -47,19 +61,12 @@ const budgetSchema = new Schema({
   },
   // 預算主題
   theme: {
-    type: Schema.Types.ObjectId,
+    type: ObjectId,
     ref: 'marketingThemes',
     required: [true, '請選擇預算主題']
   },
   // 預算項目列表
   items: [budgetItemSchema],
-  // 狀態：draft=草稿, published=已發布
-  status: {
-    type: String,
-    required: [true, '請選擇狀態'],
-    enum: ['draft', 'published'],
-    default: 'draft'
-  },
   // 備註
   note: {
     type: String,
@@ -67,24 +74,62 @@ const budgetSchema = new Schema({
   },
   // 建立者
   creator: {
-    type: Schema.Types.ObjectId,
+    type: ObjectId,
     ref: 'users',
     required: [true, '請選擇建立者']
   },
   // 最後修改者
   lastModifier: {
-    type: Schema.Types.ObjectId,
+    type: ObjectId,
     ref: 'users',
     required: [true, '請選擇最後修改者']
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  virtuals: {
+    totalBudget: {
+      get() {
+        return this.items.reduce((total, item) => total + item.total, 0)
+      }
+    }
+  }
 })
 
 // 索引
 budgetSchema.index({ year: 1, theme: 1 }, { unique: true })
-budgetSchema.index({ status: 1 })
 budgetSchema.index({ 'items.channel': 1 })
 budgetSchema.index({ 'items.platform': 1 })
+
+// 靜態方法
+budgetSchema.statics.getMonthlyBudget = async function (year, month, theme, channel, platform) {
+  const monthKey = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][month - 1]
+  
+  const result = await this.findOne({
+    year,
+    theme,
+    items: {
+      $elemMatch: {
+        channel,
+        platform
+      }
+    }
+  }).select(`items.$`)
+
+  if (!result || !result.items[0]) return 0
+  return result.items[0].monthlyBudget[monthKey] || 0
+}
+
+// 查詢助手
+budgetSchema.query.byYearTheme = function (year, theme) {
+  return this.where({ year, theme })
+}
+
+budgetSchema.query.byChannel = function (channel) {
+  return this.where({ 'items.channel': channel })
+}
+
+budgetSchema.query.byPlatform = function (platform) {
+  return this.where({ 'items.platform': platform })
+}
 
 export default model('marketingBudgets', budgetSchema) 

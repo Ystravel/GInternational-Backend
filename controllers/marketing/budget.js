@@ -6,6 +6,16 @@ import { logCreate, logUpdate, logDelete } from '../../services/auditLogService.
 // 創建預算表
 export const create = async (req, res) => {
   try {
+    // 檢查是否已存在相同年度和主題的預算表
+    const exists = await Budget.findOne({
+      year: req.body.year,
+      theme: req.body.theme
+    })
+
+    if (exists) {
+      throw new Error('DUPLICATE')
+    }
+
     const result = await Budget.create({
       ...req.body,
       creator: req.user._id,
@@ -41,9 +51,11 @@ export const getAll = async (req, res) => {
       query.theme = req.query.theme
     }
 
-    // 處理狀態篩選
-    if (req.query.status) {
-      query.status = req.query.status
+    // 處理關鍵字搜尋
+    if (req.query.search) {
+      query.$or = [
+        { note: { $regex: req.query.search, $options: 'i' } }
+      ]
     }
 
     const result = await Budget.find(query)
@@ -55,6 +67,16 @@ export const getAll = async (req, res) => {
       .sort({ year: -1, createdAt: -1 })
       .skip((page - 1) * itemsPerPage)
       .limit(itemsPerPage)
+      .lean()
+
+    // 計算每個預算表的總額
+    const resultWithTotals = result.map(budget => ({
+      ...budget,
+      totalBudget: budget.items.reduce((total, item) => {
+        const monthlyTotal = Object.values(item.monthlyBudget).reduce((sum, value) => sum + value, 0)
+        return total + monthlyTotal
+      }, 0)
+    }))
 
     const total = await Budget.countDocuments(query)
 
@@ -62,7 +84,7 @@ export const getAll = async (req, res) => {
       success: true,
       message: '',
       result: {
-        data: result,
+        data: resultWithTotals,
         totalItems: total,
         itemsPerPage,
         currentPage: page
@@ -84,8 +106,15 @@ export const getById = async (req, res) => {
       .populate('lastModifier', 'name')
       .populate('items.channel', 'name')
       .populate('items.platform', 'name')
+      .lean()
 
     if (!result) throw new Error('NOT_FOUND')
+
+    // 計算總額
+    result.totalBudget = result.items.reduce((total, item) => {
+      const monthlyTotal = Object.values(item.monthlyBudget).reduce((sum, value) => sum + value, 0)
+      return total + monthlyTotal
+    }, 0)
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -112,9 +141,17 @@ export const edit = async (req, res) => {
       throw new Error('NOT_FOUND')
     }
 
-    // 如果狀態是已發布，就不能修改
-    if (originalBudget.status === 'published') {
-      throw new Error('PUBLISHED')
+    // 檢查是否有其他預算表使用相同的年度和主題
+    if (updateData.year || updateData.theme) {
+      const exists = await Budget.findOne({
+        _id: { $ne: req.params.id },
+        year: updateData.year || originalBudget.year,
+        theme: updateData.theme || originalBudget.theme
+      })
+
+      if (exists) {
+        throw new Error('DUPLICATE')
+      }
     }
 
     const updatedBudget = await Budget.findByIdAndUpdate(
@@ -150,59 +187,12 @@ export const remove = async (req, res) => {
       throw new Error('NOT_FOUND')
     }
 
-    // 如果狀態是已發布，就不能刪除
-    if (budget.status === 'published') {
-      throw new Error('PUBLISHED')
-    }
-
     await logDelete(req.user, budget, 'marketingBudgets')
     await budget.deleteOne()
 
     res.status(StatusCodes.OK).json({
       success: true,
       message: '預算表刪除成功'
-    })
-  } catch (error) {
-    handleError(res, error)
-  }
-}
-
-// 發布預算表
-export const publish = async (req, res) => {
-  try {
-    if (!validator.isMongoId(req.params.id)) throw new Error('ID')
-
-    const budget = await Budget.findById(req.params.id)
-    if (!budget) {
-      throw new Error('NOT_FOUND')
-    }
-
-    if (budget.status === 'published') {
-      throw new Error('ALREADY_PUBLISHED')
-    }
-
-    const updateData = {
-      status: 'published',
-      lastModifier: req.user._id
-    }
-
-    const updatedBudget = await Budget.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    )
-      .populate('theme', 'name')
-      .populate('creator', 'name')
-      .populate('lastModifier', 'name')
-      .populate('items.channel', 'name')
-      .populate('items.platform', 'name')
-
-    await logUpdate(req.user, updatedBudget, 'marketingBudgets', budget.toObject(), updateData)
-
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: '預算表發布成功',
-      result: updatedBudget
     })
   } catch (error) {
     handleError(res, error)
@@ -243,7 +233,7 @@ const handleError = (res, error) => {
     })
   }
 
-  if (error.code === 11000) {
+  if (error.message === 'DUPLICATE') {
     return res.status(StatusCodes.BAD_REQUEST).json({
       success: false,
       message: '該年度的預算表已存在'
@@ -261,20 +251,6 @@ const handleError = (res, error) => {
     return res.status(StatusCodes.BAD_REQUEST).json({
       success: false,
       message: '無效的ID格式'
-    })
-  }
-
-  if (error.message === 'PUBLISHED') {
-    return res.status(StatusCodes.BAD_REQUEST).json({
-      success: false,
-      message: '已發布的預算表不能修改'
-    })
-  }
-
-  if (error.message === 'ALREADY_PUBLISHED') {
-    return res.status(StatusCodes.BAD_REQUEST).json({
-      success: false,
-      message: '預算表已經發布'
     })
   }
 

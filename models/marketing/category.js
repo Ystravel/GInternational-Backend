@@ -7,11 +7,11 @@ const categorySchema = new Schema({
     required: [true, '請輸入名稱'],
     trim: true
   },
-  // 類型：1=廣告渠道, 2=平台, 3=項目, 4=細項
+  // 類型：0=行銷主題, 1=廣告渠道, 2=平台, 3=細項
   type: {
     type: Number,
     required: [true, '請選擇類型'],
-    enum: [1, 2, 3, 4]
+    enum: [0, 1, 2, 3]
   },
   // 是否啟用
   isActive: {
