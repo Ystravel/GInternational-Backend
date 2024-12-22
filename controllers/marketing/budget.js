@@ -2,6 +2,7 @@ import { StatusCodes } from 'http-status-codes'
 import Budget from '../../models/marketing/budget.js'
 import validator from 'validator'
 import { logCreate, logUpdate, logDelete } from '../../services/auditLogService.js'
+import mongoose from 'mongoose'
 
 // 創建預算表
 export const create = async (req, res) => {
@@ -41,7 +42,7 @@ export const getAll = async (req, res) => {
     const page = parseInt(req.query.page) || 1
     const query = {}
 
-    // 處理年度篩選
+    // 處理���度篩選
     if (req.query.year) {
       query.year = parseInt(req.query.year)
     }
@@ -143,13 +144,18 @@ export const edit = async (req, res) => {
 
     // 檢查是否有其他預算表使用相同的年度和主題
     if (updateData.year || updateData.theme) {
-      const exists = await Budget.findOne({
-        _id: { $ne: req.params.id },
+      // 先找出所有符合年度和主題的預算表
+      const duplicates = await Budget.find({
         year: updateData.year || originalBudget.year,
         theme: updateData.theme || originalBudget.theme
-      })
+      }).lean()
 
-      if (exists) {
+      // 然後過濾掉當前正在編輯的預算表
+      const otherDuplicates = duplicates.filter(budget => 
+        budget._id.toString() !== req.params.id
+      )
+
+      if (otherDuplicates.length > 0) {
         throw new Error('DUPLICATE')
       }
     }

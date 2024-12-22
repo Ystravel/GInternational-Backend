@@ -62,7 +62,7 @@ const budgetSchema = new Schema({
   // 預算主題
   theme: {
     type: ObjectId,
-    ref: 'marketingThemes',
+    ref: 'marketingCategories',
     required: [true, '請選擇預算主題']
   },
   // 預算項目列表
