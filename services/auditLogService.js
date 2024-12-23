@@ -52,6 +52,13 @@ export const logCreate = async (operator, target, targetModel) => {
         targetInfo.name = target.name
         targetInfo.type = target.type
         break
+      case 'marketingCategories':
+        targetInfo.name = target.name
+        break
+      case 'marketingExpenses':
+        targetInfo.invoiceDate = target.invoiceDate
+        targetInfo.theme = target.theme?.name || ''
+        break
     }
   }
 
@@ -102,6 +109,13 @@ export const logUpdate = async (operator, target, targetModel, originalData, new
       case 'formTemplates':
         targetInfo.name = target.name
         targetInfo.type = target.type
+        break
+      case 'marketingCategories':
+        targetInfo.name = target.name
+        break
+      case 'marketingExpenses':
+        targetInfo.invoiceDate = target.invoiceDate
+        targetInfo.theme = target.theme?.name || ''
         break
     }
   }
@@ -162,6 +176,13 @@ export const logDelete = async (operator, target, targetModel) => {
       case 'formTemplates':
         targetInfo.name = target.name
         targetInfo.type = target.type
+        break
+      case 'marketingCategories':
+        targetInfo.name = target.name
+        break
+      case 'marketingExpenses':
+        targetInfo.invoiceDate = target.invoiceDate
+        targetInfo.theme = target.theme?.name || ''
         break
     }
   }

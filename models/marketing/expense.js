@@ -81,11 +81,11 @@ const expenseSchema = new Schema({
 
 // 索引
 expenseSchema.index({ year: 1, invoiceDate: 1 })
-expenseSchema.index({ year: 1, theme: 1 })
-expenseSchema.index({ year: 1, channel: 1 })
-expenseSchema.index({ year: 1, platform: 1 })
-expenseSchema.index({ year: 1, detail: 1 })
-expenseSchema.index({ relatedBudget: 1 })
+expenseSchema.index({ year: 1, theme: 1 }, { unique: false })
+expenseSchema.index({ year: 1, channel: 1 }, { unique: false })
+expenseSchema.index({ year: 1, platform: 1 }, { unique: false })
+expenseSchema.index({ year: 1, detail: 1 }, { unique: false })
+expenseSchema.index({ relatedBudget: 1 }, { unique: false })
 
 // 靜態方法
 expenseSchema.statics.getMonthlyTotal = async function (year, month, theme, channel, platform) {

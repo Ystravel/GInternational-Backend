@@ -7,6 +7,8 @@ import mongoose from 'mongoose'
 // 創建實際花費
 export const create = async (req, res) => {
   try {
+    console.log('Creating expense with data:', req.body)
+
     const result = await Expense.create({
       ...req.body,
       creator: req.user._id,
@@ -21,6 +23,7 @@ export const create = async (req, res) => {
       result
     })
   } catch (error) {
+    console.error('Error creating expense:', error)
     handleError(res, error)
   }
 }
@@ -30,68 +33,60 @@ export const getAll = async (req, res) => {
   try {
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
     const page = parseInt(req.query.page) || 1
-    const matchQuery = {}
-
-    // 處理年度篩選
-    if (req.query.year) {
-      matchQuery.year = parseInt(req.query.year)
-    }
-
-    // 處理主題篩選
-    if (req.query.theme && validator.isMongoId(req.query.theme)) {
-      matchQuery.theme = new mongoose.Types.ObjectId(req.query.theme)
-    }
-
-    // 處理渠道篩選
-    if (req.query.channel && validator.isMongoId(req.query.channel)) {
-      matchQuery.channel = new mongoose.Types.ObjectId(req.query.channel)
-    }
-
-    // 處理平台篩選
-    if (req.query.platform && validator.isMongoId(req.query.platform)) {
-      matchQuery.platform = new mongoose.Types.ObjectId(req.query.platform)
-    }
-
-    // 處理細項篩選
-    if (req.query.detail && validator.isMongoId(req.query.detail)) {
-      matchQuery.detail = new mongoose.Types.ObjectId(req.query.detail)
-    }
-
-    // 處理關聯預算表篩選
-    if (req.query.relatedBudget && validator.isMongoId(req.query.relatedBudget)) {
-      matchQuery.relatedBudget = new mongoose.Types.ObjectId(req.query.relatedBudget)
-    }
-
-    // 處理日期範圍篩選
-    if (req.query.startDate && req.query.endDate) {
-      matchQuery.invoiceDate = {
-        $gte: new Date(req.query.startDate),
-        $lte: new Date(req.query.endDate)
-      }
-    }
-
-    // 處理關鍵字搜尋
-    if (req.query.search) {
-      const searchRegex = new RegExp(req.query.search, 'i')
-      const searchQuery = [
-        { note: searchRegex }
-      ]
-
-      // 如果搜尋字串是數字，也加入金額搜尋
-      const searchNumber = parseFloat(req.query.search)
-      if (!isNaN(searchNumber)) {
-        searchQuery.push({ expense: searchNumber })
-      }
-
-      matchQuery.$or = searchQuery
-    }
 
     // 建立基本的聚合管道
-    const pipeline = [
-      // 首先進行主要的篩選
-      { $match: matchQuery },
+    const pipeline = []
 
-      // 然後進行關聯查詢
+    // 建立 match 條件
+    const matchConditions = {}
+
+    // 處理日期範圍查詢
+    if (req.query.startDate && req.query.endDate) {
+      try {
+        // 解析日期
+        const startDate = new Date(req.query.startDate)
+        const endDate = new Date(req.query.endDate)
+
+        // 設置 match 條件
+        matchConditions.invoiceDate = {
+          $gte: startDate,
+          $lte: endDate
+        }
+
+        // 調試日誌
+        console.log('後端日期處理:', {
+          收到的開始日期: req.query.startDate,
+          收到的結束日期: req.query.endDate,
+          解析後開始日期: startDate.toISOString(),
+          解析後結束日期: endDate.toISOString()
+        })
+      } catch (error) {
+        console.error('日期處理錯誤:', error)
+      }
+    }
+
+    // 處理其他搜尋條件
+    if (req.query.theme && validator.isMongoId(req.query.theme)) {
+      matchConditions.theme = new mongoose.Types.ObjectId(req.query.theme)
+    }
+    if (req.query.channel && validator.isMongoId(req.query.channel)) {
+      matchConditions.channel = new mongoose.Types.ObjectId(req.query.channel)
+    }
+    if (req.query.platform && validator.isMongoId(req.query.platform)) {
+      matchConditions.platform = new mongoose.Types.ObjectId(req.query.platform)
+    }
+    if (req.query.detail && validator.isMongoId(req.query.detail)) {
+      matchConditions.detail = new mongoose.Types.ObjectId(req.query.detail)
+    }
+    if (req.query.relatedBudget && validator.isMongoId(req.query.relatedBudget)) {
+      matchConditions.relatedBudget = new mongoose.Types.ObjectId(req.query.relatedBudget)
+    }
+
+    // 添加 $match 階段
+    pipeline.push({ $match: matchConditions })
+
+    // 關聯查詢
+    pipeline.push(
       {
         $lookup: {
           from: 'users',
@@ -139,15 +134,6 @@ export const getAll = async (req, res) => {
       { $unwind: '$detail' },
       {
         $lookup: {
-          from: 'users',
-          localField: 'lastModifier',
-          foreignField: '_id',
-          as: 'lastModifier'
-        }
-      },
-      { $unwind: '$lastModifier' },
-      {
-        $lookup: {
           from: 'marketingbudgets',
           localField: 'relatedBudget',
           foreignField: '_id',
@@ -159,20 +145,22 @@ export const getAll = async (req, res) => {
           path: '$relatedBudget',
           preserveNullAndEmptyArrays: true
         }
-      }
-    ]
-
-    // 如果有搜尋關鍵字，添加對 creator.name 的搜尋
-    if (req.query.search) {
-      pipeline.push({
-        $match: {
-          $or: [
-            { 'creator.name': new RegExp(req.query.search, 'i') },
-            ...matchQuery.$or
-          ]
+      },
+      {
+        $lookup: {
+          from: 'marketingcategories',
+          localField: 'relatedBudget.theme',
+          foreignField: '_id',
+          as: 'relatedBudget.theme'
         }
-      })
-    }
+      },
+      {
+        $unwind: {
+          path: '$relatedBudget.theme',
+          preserveNullAndEmptyArrays: true
+        }
+      }
+    )
 
     // 添加排序
     pipeline.push({ $sort: { invoiceDate: -1, createdAt: -1 } })

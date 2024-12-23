@@ -40,35 +40,73 @@ export const getAll = async (req, res) => {
   try {
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
     const page = parseInt(req.query.page) || 1
-    const query = {}
 
-    // 處理���度篩選
+    // 建立聚合管道
+    const pipeline = [
+      // 關聯查詢
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'creator',
+          foreignField: '_id',
+          as: 'creator'
+        }
+      },
+      { $unwind: '$creator' },
+      {
+        $lookup: {
+          from: 'marketingcategories',
+          localField: 'theme',
+          foreignField: '_id',
+          as: 'theme'
+        }
+      },
+      { $unwind: '$theme' }
+    ]
+
+    // 處理年度篩選
     if (req.query.year) {
-      query.year = parseInt(req.query.year)
+      pipeline.push({
+        $match: { year: parseInt(req.query.year) }
+      })
     }
 
     // 處理主題篩選
     if (req.query.theme && validator.isMongoId(req.query.theme)) {
-      query.theme = req.query.theme
+      pipeline.push({
+        $match: { 'theme._id': new mongoose.Types.ObjectId(req.query.theme) }
+      })
     }
 
     // 處理關鍵字搜尋
     if (req.query.search) {
-      query.$or = [
-        { note: { $regex: req.query.search, $options: 'i' } }
-      ]
+      pipeline.push({
+        $match: {
+          $or: [
+            { note: new RegExp(req.query.search, 'i') },
+            { 'creator.name': new RegExp(req.query.search, 'i') }
+          ]
+        }
+      })
     }
 
-    const result = await Budget.find(query)
-      .populate('theme', 'name')
-      .populate('creator', 'name')
-      .populate('lastModifier', 'name')
-      .populate('items.channel', 'name')
-      .populate('items.platform', 'name')
-      .sort({ year: -1, createdAt: -1 })
-      .skip((page - 1) * itemsPerPage)
-      .limit(itemsPerPage)
-      .lean()
+    // 添加排序
+    pipeline.push({ $sort: { year: -1, createdAt: -1 } })
+
+    // 計算總數的管道
+    const countPipeline = [...pipeline, { $count: 'total' }]
+
+    // 添加分頁
+    pipeline.push(
+      { $skip: (page - 1) * itemsPerPage },
+      { $limit: itemsPerPage }
+    )
+
+    // 執行查詢
+    const [result, totalCount] = await Promise.all([
+      Budget.aggregate(pipeline),
+      Budget.aggregate(countPipeline)
+    ])
 
     // 計算每個預算表的總額
     const resultWithTotals = result.map(budget => ({
@@ -79,14 +117,12 @@ export const getAll = async (req, res) => {
       }, 0)
     }))
 
-    const total = await Budget.countDocuments(query)
-
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
       result: {
         data: resultWithTotals,
-        totalItems: total,
+        totalItems: totalCount[0]?.total || 0,
         itemsPerPage,
         currentPage: page
       }
@@ -242,7 +278,7 @@ const handleError = (res, error) => {
   if (error.message === 'DUPLICATE') {
     return res.status(StatusCodes.BAD_REQUEST).json({
       success: false,
-      message: '該年度的預算表已存在'
+      message: '該年度已有同一主題的預算表'
     })
   }
 
