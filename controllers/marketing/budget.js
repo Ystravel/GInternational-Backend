@@ -38,60 +38,58 @@ export const create = async (req, res) => {
 // 取得預算表列表
 export const getAll = async (req, res) => {
   try {
+    const query = {}
+    const { search, year, theme } = req.query
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
     const page = parseInt(req.query.page) || 1
 
-    // 建立聚合管道
-    const pipeline = [
-      // 關聯查詢
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'creator',
-          foreignField: '_id',
-          as: 'creator'
-        }
-      },
-      { $unwind: '$creator' },
-      {
-        $lookup: {
-          from: 'marketingcategories',
-          localField: 'theme',
-          foreignField: '_id',
-          as: 'theme'
-        }
-      },
-      { $unwind: '$theme' }
-    ]
+    // 建立基本的聚合管道
+    const pipeline = []
 
-    // 處理年度篩選
-    if (req.query.year) {
-      pipeline.push({
-        $match: { year: parseInt(req.query.year) }
-      })
+    // 關聯查詢
+    pipeline.push(
+      { $lookup: { from: 'marketingcategories', localField: 'theme', foreignField: '_id', as: 'theme' } },
+      { $unwind: '$theme' },
+      { $lookup: { from: 'users', localField: 'creator', foreignField: '_id', as: 'creator' } },
+      { $unwind: '$creator' }
+    )
+
+    // 處理搜尋條件
+    const matchConditions = {}
+
+    // 處理建立日期範圍搜尋
+    if (req.query.createdDateStart && req.query.createdDateEnd) {
+      matchConditions.createdAt = {
+        $gte: new Date(req.query.createdDateStart),
+        $lte: new Date(req.query.createdDateEnd)
+      }
     }
 
-    // 處理主題篩選
-    if (req.query.theme && validator.isMongoId(req.query.theme)) {
-      pipeline.push({
-        $match: { 'theme._id': new mongoose.Types.ObjectId(req.query.theme) }
-      })
+    // 處理年度搜尋
+    if (year) {
+      matchConditions.year = parseInt(year)
+    }
+
+    // 處理主題搜尋
+    if (theme) {
+      matchConditions['theme._id'] = new mongoose.Types.ObjectId(theme)
     }
 
     // 處理關鍵字搜尋
-    if (req.query.search) {
-      pipeline.push({
-        $match: {
-          $or: [
-            { note: new RegExp(req.query.search, 'i') },
-            { 'creator.name': new RegExp(req.query.search, 'i') }
-          ]
-        }
-      })
+    if (search) {
+      matchConditions.$or = [
+        { note: { $regex: search, $options: 'i' } },
+        { 'creator.name': { $regex: search, $options: 'i' } }
+      ]
+    }
+
+    // 添加搜尋條件到管道
+    if (Object.keys(matchConditions).length > 0) {
+      pipeline.push({ $match: matchConditions })
     }
 
     // 添加排序
-    pipeline.push({ $sort: { year: -1, createdAt: -1 } })
+    pipeline.push({ $sort: { createdAt: -1 } })
 
     // 計算總數的管道
     const countPipeline = [...pipeline, { $count: 'total' }]
@@ -112,7 +110,7 @@ export const getAll = async (req, res) => {
     const resultWithTotals = result.map(budget => ({
       ...budget,
       totalBudget: budget.items.reduce((total, item) => {
-        const monthlyTotal = Object.values(item.monthlyBudget).reduce((sum, value) => sum + value, 0)
+        const monthlyTotal = Object.values(item.monthlyBudget).reduce((sum, value) => sum + (value || 0), 0)
         return total + monthlyTotal
       }, 0)
     }))
@@ -128,6 +126,7 @@ export const getAll = async (req, res) => {
       }
     })
   } catch (error) {
+    console.error('Error in getAll:', error)
     handleError(res, error)
   }
 }

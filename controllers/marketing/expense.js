@@ -15,12 +15,21 @@ export const create = async (req, res) => {
       lastModifier: req.user._id
     })
 
-    await logCreate(req.user, result, 'marketingExpenses')
+    // 在記錄異動前先填充所有關聯資料
+    const populatedResult = await Expense.findById(result._id)
+      .populate('theme', 'name')
+      .populate('channel', 'name')
+      .populate('platform', 'name')
+      .populate('details.detail', 'name')
+      .populate('creator', 'name')
+      .populate('lastModifier', 'name')
+
+    await logCreate(req.user, populatedResult, 'marketingExpenses')
 
     res.status(StatusCodes.OK).json({
       success: true,
       message: '實際花費創建成功',
-      result
+      result: populatedResult
     })
   } catch (error) {
     console.error('Error creating expense:', error)
@@ -31,136 +40,59 @@ export const create = async (req, res) => {
 // 取得實際花費列表
 export const getAll = async (req, res) => {
   try {
+    const query = { }
+    const { search, theme, channel, platform, detail } = req.query
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
     const page = parseInt(req.query.page) || 1
+
+    // 處理發票日期範圍搜尋
+    if (req.query.invoiceDateStart && req.query.invoiceDateEnd) {
+      query.invoiceDate = {
+        $gte: new Date(req.query.invoiceDateStart),
+        $lte: new Date(req.query.invoiceDateEnd)
+      }
+    }
+
+    // 處理建立日期範圍搜尋
+    if (req.query.createdDateStart && req.query.createdDateEnd) {
+      query.createdAt = {
+        $gte: new Date(req.query.createdDateStart),
+        $lte: new Date(req.query.createdDateEnd)
+      }
+    }
+
+    // 其他搜尋條件
+    if (theme) query.theme = new mongoose.Types.ObjectId(theme)
+    if (channel) query.channel = new mongoose.Types.ObjectId(channel)
+    if (platform) query.platform = new mongoose.Types.ObjectId(platform)
+    if (detail) query['details.detail'] = new mongoose.Types.ObjectId(detail)
+    if (search) {
+      query.$or = [
+        { note: { $regex: search, $options: 'i' } },
+        { 'creator.name': { $regex: search, $options: 'i' } }
+      ]
+    }
 
     // 建立基本的聚合管道
     const pipeline = []
 
-    // 建立 match 條件
-    const matchConditions = {}
-
-    // 處理日期範圍查詢
-    if (req.query.startDate && req.query.endDate) {
-      try {
-        // 解析日期
-        const startDate = new Date(req.query.startDate)
-        const endDate = new Date(req.query.endDate)
-
-        // 設置 match 條件
-        matchConditions.invoiceDate = {
-          $gte: startDate,
-          $lte: endDate
-        }
-
-        // 調試日誌
-        console.log('後端日期處理:', {
-          收到的開始日期: req.query.startDate,
-          收到的結束日期: req.query.endDate,
-          解析後開始日期: startDate.toISOString(),
-          解析後結束日期: endDate.toISOString()
-        })
-      } catch (error) {
-        console.error('日期處理錯誤:', error)
-      }
-    }
-
-    // 處理其他搜尋條件
-    if (req.query.theme && validator.isMongoId(req.query.theme)) {
-      matchConditions.theme = new mongoose.Types.ObjectId(req.query.theme)
-    }
-    if (req.query.channel && validator.isMongoId(req.query.channel)) {
-      matchConditions.channel = new mongoose.Types.ObjectId(req.query.channel)
-    }
-    if (req.query.platform && validator.isMongoId(req.query.platform)) {
-      matchConditions.platform = new mongoose.Types.ObjectId(req.query.platform)
-    }
-    if (req.query.detail && validator.isMongoId(req.query.detail)) {
-      matchConditions.detail = new mongoose.Types.ObjectId(req.query.detail)
-    }
-    if (req.query.relatedBudget && validator.isMongoId(req.query.relatedBudget)) {
-      matchConditions.relatedBudget = new mongoose.Types.ObjectId(req.query.relatedBudget)
-    }
-
-    // 添加 $match 階段
-    pipeline.push({ $match: matchConditions })
-
     // 關聯查詢
     pipeline.push(
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'creator',
-          foreignField: '_id',
-          as: 'creator'
-        }
-      },
-      { $unwind: '$creator' },
-      {
-        $lookup: {
-          from: 'marketingcategories',
-          localField: 'theme',
-          foreignField: '_id',
-          as: 'theme'
-        }
-      },
+      { $lookup: { from: 'marketingcategories', localField: 'theme', foreignField: '_id', as: 'theme' } },
       { $unwind: '$theme' },
-      {
-        $lookup: {
-          from: 'marketingcategories',
-          localField: 'channel',
-          foreignField: '_id',
-          as: 'channel'
-        }
-      },
+      { $lookup: { from: 'marketingcategories', localField: 'channel', foreignField: '_id', as: 'channel' } },
       { $unwind: '$channel' },
-      {
-        $lookup: {
-          from: 'marketingcategories',
-          localField: 'platform',
-          foreignField: '_id',
-          as: 'platform'
-        }
-      },
+      { $lookup: { from: 'marketingcategories', localField: 'platform', foreignField: '_id', as: 'platform' } },
       { $unwind: '$platform' },
-      {
-        $lookup: {
-          from: 'marketingcategories',
-          localField: 'detail',
-          foreignField: '_id',
-          as: 'detail'
-        }
-      },
-      { $unwind: '$detail' },
-      {
-        $lookup: {
-          from: 'marketingbudgets',
-          localField: 'relatedBudget',
-          foreignField: '_id',
-          as: 'relatedBudget'
-        }
-      },
-      {
-        $unwind: {
-          path: '$relatedBudget',
-          preserveNullAndEmptyArrays: true
-        }
-      },
-      {
-        $lookup: {
-          from: 'marketingcategories',
-          localField: 'relatedBudget.theme',
-          foreignField: '_id',
-          as: 'relatedBudget.theme'
-        }
-      },
-      {
-        $unwind: {
-          path: '$relatedBudget.theme',
-          preserveNullAndEmptyArrays: true
-        }
-      }
+      { $lookup: { from: 'marketingcategories', localField: 'details.detail', foreignField: '_id', as: 'detailsInfo' } },
+      { $lookup: { from: 'users', localField: 'creator', foreignField: '_id', as: 'creator' } },
+      { $unwind: '$creator' }
     )
+
+    // 添加基本 match 條件
+    if (Object.keys(query).length > 0) {
+      pipeline.push({ $match: query })
+    }
 
     // 添加排序
     pipeline.push({ $sort: { invoiceDate: -1, createdAt: -1 } })
@@ -205,8 +137,7 @@ export const getById = async (req, res) => {
       .populate('theme', 'name')
       .populate('channel', 'name')
       .populate('platform', 'name')
-      .populate('detail', 'name')
-      .populate('relatedBudget', 'year theme')
+      .populate('details.detail', 'name')
       .populate('creator', 'name')
       .populate('lastModifier', 'name')
 
@@ -232,11 +163,20 @@ export const edit = async (req, res) => {
       lastModifier: req.user._id
     }
 
+    // 獲取並填充原始資料
     const originalExpense = await Expense.findById(req.params.id)
+      .populate('theme', 'name')
+      .populate('channel', 'name')
+      .populate('platform', 'name')
+      .populate('details.detail', 'name')
+      .populate('creator', 'name')
+      .populate('lastModifier', 'name')
+
     if (!originalExpense) {
       throw new Error('NOT_FOUND')
     }
 
+    // 更新資料並填充
     const updatedExpense = await Expense.findByIdAndUpdate(
       req.params.id,
       updateData,
@@ -245,12 +185,48 @@ export const edit = async (req, res) => {
       .populate('theme', 'name')
       .populate('channel', 'name')
       .populate('platform', 'name')
-      .populate('detail', 'name')
-      .populate('relatedBudget', 'year theme')
+      .populate('details.detail', 'name')
       .populate('creator', 'name')
       .populate('lastModifier', 'name')
 
-    await logUpdate(req.user, updatedExpense, 'marketingExpenses', originalExpense.toObject(), updateData)
+    // 準備原始資料
+    const originalData = {
+      invoiceDate: originalExpense.invoiceDate,
+      year: originalExpense.year,
+      totalExpense: originalExpense.totalExpense,
+      note: originalExpense.note,
+      theme: originalExpense.theme?.name,
+      channel: originalExpense.channel?.name,
+      platform: originalExpense.platform?.name,
+      details: originalExpense.details.map(d => ({
+        detail: d.detail?.name,
+        amount: d.amount
+      }))
+    }
+
+    // 準備新資料
+    const newData = {
+      invoiceDate: updatedExpense.invoiceDate,
+      year: updatedExpense.year,
+      totalExpense: updatedExpense.totalExpense,
+      note: updatedExpense.note,
+      theme: updatedExpense.theme?.name,
+      channel: updatedExpense.channel?.name,
+      platform: updatedExpense.platform?.name,
+      details: updatedExpense.details.map(d => ({
+        detail: d.detail?.name,
+        amount: d.amount
+      }))
+    }
+
+    // 記錄異動
+    await logUpdate(
+      req.user,
+      updatedExpense,
+      'marketingExpenses',
+      originalData,
+      newData
+    )
 
     res.status(StatusCodes.OK).json({
       success: true,

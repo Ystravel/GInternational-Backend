@@ -7,7 +7,7 @@ const categorySchema = new Schema({
     required: [true, '請輸入名稱'],
     trim: true
   },
-  // 類型：0=行銷主題, 1=廣告渠道, 2=平台, 3=細項
+  // 類型：0=行銷主題, 1=廣告渠道, 2=平台, 3=線別
   type: {
     type: Number,
     required: [true, '請選擇類型'],

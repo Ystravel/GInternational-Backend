@@ -26,19 +26,25 @@ const auditLogSchema = new Schema({
     name: String,
     userId: String
   },
-  targetInfo: {
+  targetInfo: new Schema({
     name: String,
     userId: String,
-    formNumber: String
-  },
+    formNumber: String,
+    invoiceDate: Date,
+    theme: String,
+    clientName: String,
+    type: String
+  }, { _id: false }),
   changes: {
     type: {
       before: Object,
-      after: Object
+      after: Object,
+      changedFields: [String]
     },
     default: {
       before: {},
-      after: {}
+      after: {},
+      changedFields: []
     }
   }
 }, {

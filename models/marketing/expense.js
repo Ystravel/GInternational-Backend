@@ -29,22 +29,24 @@ const expenseSchema = new Schema({
     ref: 'marketingCategories',
     required: [true, '請選擇平台']
   },
-  // 細項
-  detail: {
-    type: ObjectId,
-    ref: 'marketingCategories',
-    required: [true, '請選擇細項']
-  },
-  // 關聯的預算表
-  relatedBudget: {
-    type: ObjectId,
-    ref: 'marketingBudgets',
-    default: null
-  },
-  // 費用金額
-  expense: {
+  // 線別及費用明細
+  details: [{
+    // 線別
+    detail: {
+      type: ObjectId,
+      ref: 'marketingCategories',
+      required: [true, '請選擇線別']
+    },
+    // 個別費用
+    amount: {
+      type: Number,
+      required: [true, '請填寫費用']
+    }
+  }],
+  // 總費用金額
+  totalExpense: {
     type: Number,
-    required: [true, '請填寫費用']
+    required: [true, '請填寫總費用']
   },
   // 備註
   note: {
@@ -79,13 +81,25 @@ const expenseSchema = new Schema({
   }
 })
 
-// 索引
+// 基本查詢索引
+expenseSchema.index({ year: 1 })
+expenseSchema.index({ invoiceDate: 1 })
+expenseSchema.index({ theme: 1 })
+expenseSchema.index({ channel: 1 })
+expenseSchema.index({ platform: 1 })
+expenseSchema.index({ 'details.detail': 1 })
+
+// 複合索引用於快速搜尋
+expenseSchema.index({ year: 1, theme: 1 })
+expenseSchema.index({ year: 1, channel: 1 })
+expenseSchema.index({ year: 1, platform: 1 })
 expenseSchema.index({ year: 1, invoiceDate: 1 })
-expenseSchema.index({ year: 1, theme: 1 }, { unique: false })
-expenseSchema.index({ year: 1, channel: 1 }, { unique: false })
-expenseSchema.index({ year: 1, platform: 1 }, { unique: false })
-expenseSchema.index({ year: 1, detail: 1 }, { unique: false })
-expenseSchema.index({ relatedBudget: 1 }, { unique: false })
+
+// 在儲存前計算總費用
+expenseSchema.pre('save', function(next) {
+  this.totalExpense = this.details.reduce((sum, detail) => sum + detail.amount, 0)
+  next()
+})
 
 // 靜態方法
 expenseSchema.statics.getMonthlyTotal = async function (year, month, theme, channel, platform) {
@@ -107,7 +121,7 @@ expenseSchema.statics.getMonthlyTotal = async function (year, month, theme, chan
     {
       $group: {
         _id: null,
-        total: { $sum: '$expense' }
+        total: { $sum: '$totalExpense' }
       }
     }
   ])

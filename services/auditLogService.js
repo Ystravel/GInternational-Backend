@@ -95,59 +95,75 @@ export const logUpdate = async (operator, target, targetModel, originalData, new
   }
 
   // 根據不同的 targetModel 處理 targetInfo
-  const targetInfo = {}
+  let targetInfo = {}
   if (target) {
     switch (targetModel) {
       case 'users':
-        targetInfo.name = target.name
-        targetInfo.userId = target.userId || target.adminId
+        targetInfo = {
+          name: target.name,
+          userId: target.userId || target.adminId
+        }
         break
       case 'forms':
-        targetInfo.formNumber = target.formNumber
-        targetInfo.clientName = target.clientName
+        targetInfo = {
+          formNumber: target.formNumber,
+          clientName: target.clientName
+        }
         break
       case 'formTemplates':
-        targetInfo.name = target.name
-        targetInfo.type = target.type
+        targetInfo = {
+          name: target.name,
+          type: target.type
+        }
         break
       case 'marketingCategories':
-        targetInfo.name = target.name
+        targetInfo = {
+          name: target.name
+        }
         break
       case 'marketingExpenses':
-        targetInfo.invoiceDate = target.invoiceDate
-        targetInfo.theme = target.theme?.name || ''
+        targetInfo = {
+          invoiceDate: target.invoiceDate ? new Date(target.invoiceDate) : undefined,
+          theme: target.theme?.name || undefined
+        }
         break
     }
   }
 
-  // 過濾掉敏感資料
-  const filteredOriginalData = { ...originalData }
-  const filteredNewData = { ...newData }
-  
+  // 移除未定義的屬性
+  Object.keys(targetInfo).forEach(key => 
+    targetInfo[key] === undefined && delete targetInfo[key]
+  )
+
+  // 移除敏感資料
   const sensitiveFields = ['password', 'confirmPassword', 'tokens', '__v']
   sensitiveFields.forEach(field => {
-    delete filteredOriginalData[field]
-    delete filteredNewData[field]
+    delete originalData[field]
+    delete newData[field]
   })
 
   // 計算變更的欄位
-  const changes = {
-    before: filteredOriginalData,
-    after: filteredNewData,
-    changedFields: Object.keys(filteredNewData).filter(key => 
-      JSON.stringify(filteredOriginalData[key]) !== JSON.stringify(filteredNewData[key])
-    )
-  }
+  const changedFields = Object.keys(newData).filter(key => 
+    JSON.stringify(originalData[key]) !== JSON.stringify(newData[key])
+  )
 
-  return createAuditLog({
+  const auditLog = {
     operatorId: operator?._id || null,
     action: '修改',
     targetId: target._id,
     targetModel,
     operatorInfo,
     targetInfo,
-    changes
-  })
+    changes: {
+      before: originalData,
+      after: newData,
+      changedFields
+    }
+  }
+
+  console.log('準備創建異動紀錄:', JSON.stringify(auditLog, null, 2))
+
+  return createAuditLog(auditLog)
 }
 
 // 用於記錄刪除操作
