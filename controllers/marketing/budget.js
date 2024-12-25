@@ -250,7 +250,7 @@ export const getYearOptions = async (req, res) => {
     for (let year = 2024; year <= currentYear + 5; year++) {
       years.push(year)
     }
-
+    
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
@@ -261,42 +261,84 @@ export const getYearOptions = async (req, res) => {
   }
 }
 
-// 統一錯誤處理
+// 根據年度和主題取得預算表
+export const getByYearAndTheme = async (req, res) => {
+  try {
+    const { year, theme } = req.params
+
+    if (!year || !theme) {
+      throw new Error('MISSING_PARAMS')
+    }
+
+    // 確保 theme 是有效的 MongoDB ObjectId
+    if (!validator.isMongoId(theme)) {
+      throw new Error('INVALID_THEME')
+    }
+
+    const result = await Budget.findOne({
+      year: parseInt(year),
+      theme: theme
+    })
+      .populate('theme', 'name')
+      .populate('creator', 'name')
+      .populate('lastModifier', 'name')
+      .populate('items.channel', 'name')
+      .populate('items.platform', 'name')
+      .lean()
+
+    if (!result) {
+      throw new Error('NOT_FOUND')
+    }
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result
+    })
+  } catch (error) {
+    handleError(res, error)
+  }
+}
+
+// 錯誤處理函數
 const handleError = (res, error) => {
-  console.error('Error details:', error)
+  console.error('Error:', error)
 
-  if (error.name === 'ValidationError') {
-    const key = Object.keys(error.errors)[0]
-    const message = error.errors[key].message
-    return res.status(StatusCodes.BAD_REQUEST).json({
-      success: false,
-      message
-    })
+  switch (error.message) {
+    case 'ID':
+      res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '無效的ID'
+      })
+      break
+    case 'NOT_FOUND':
+      res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: '找不到預算表'
+      })
+      break
+    case 'DUPLICATE':
+      res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '已存在相同年度和主題的預算表'
+      })
+      break
+    case 'MISSING_PARAMS':
+      res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '缺少必要參數'
+      })
+      break
+    case 'INVALID_THEME':
+      res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '無效的主題ID'
+      })
+      break
+    default:
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: '發生錯誤'
+      })
   }
-
-  if (error.message === 'DUPLICATE') {
-    return res.status(StatusCodes.BAD_REQUEST).json({
-      success: false,
-      message: '該年度已有同一主題的預算表'
-    })
-  }
-
-  if (error.message === 'NOT_FOUND') {
-    return res.status(StatusCodes.NOT_FOUND).json({
-      success: false,
-      message: '找不到預算表'
-    })
-  }
-
-  if (error.message === 'ID') {
-    return res.status(StatusCodes.BAD_REQUEST).json({
-      success: false,
-      message: '無效的ID格式'
-    })
-  }
-
-  return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-    success: false,
-    message: '未知錯誤'
-  })
 } 

@@ -13,10 +13,10 @@ import UserRole from '../../enums/UserRole.js'
 const router = Router()
 
 // 需要管理者權限的路由
-router.post('/', auth.jwt, checkRole([UserRole.ADMIN]), create)
-router.get('/all', auth.jwt, checkRole([UserRole.ADMIN]), getAll)
-router.patch('/:id', auth.jwt, checkRole([UserRole.ADMIN]), edit)
-router.delete('/:id', auth.jwt, checkRole([UserRole.ADMIN]), remove)
+router.post('/', auth.jwt, checkRole([UserRole.ADMIN, UserRole.MANAGER]), create)
+router.get('/all', auth.jwt, checkRole([UserRole.ADMIN, UserRole.MANAGER]), getAll)
+router.patch('/:id', auth.jwt, checkRole([UserRole.ADMIN, UserRole.MANAGER]), edit)
+router.delete('/:id', auth.jwt, checkRole([UserRole.ADMIN, UserRole.MANAGER]), remove)
 
 // 一般用戶也可以使用的路由
 router.get('/options', auth.jwt, getOptions)
