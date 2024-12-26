@@ -240,17 +240,17 @@ export const remove = async (req, res) => {
   }
 }
 
-// 取得年度選項
-export const getYearOptions = async (req, res) => {
+// 根據主題獲取年度選項
+export const getYearsByTheme = async (req, res) => {
   try {
-    const currentYear = new Date().getFullYear()
-    const years = []
+    const { theme } = req.params
     
-    // 從2024年開始到當前年份後5年
-    for (let year = 2024; year <= currentYear + 5; year++) {
-      years.push(year)
-    }
+    // 從資料庫中查詢該主題下所有不重複的年度
+    const years = await Budget.distinct('year', { theme })
     
+    // 排序年度
+    years.sort((a, b) => b - a)
+
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
@@ -340,5 +340,26 @@ const handleError = (res, error) => {
         success: false,
         message: '發生錯誤'
       })
+  }
+}
+
+// 保留原有的 getYearOptions 函數
+export const getYearOptions = async (req, res) => {
+  try {
+    const currentYear = new Date().getFullYear()
+    const years = []
+    
+    // 從2024年開始到當前年份後5年
+    for (let year = 2024; year <= currentYear + 5; year++) {
+      years.push(year)
+    }
+    
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result: years
+    })
+  } catch (error) {
+    handleError(res, error)
   }
 } 

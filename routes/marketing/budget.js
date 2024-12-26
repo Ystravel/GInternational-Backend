@@ -6,7 +6,8 @@ import {
   edit,
   remove,
   getYearOptions,
-  getByYearAndTheme
+  getByYearAndTheme,
+  getYearsByTheme
 } from '../../controllers/marketing/budget.js'
 import * as auth from '../../middlewares/auth.js'
 import checkRole from '../../middlewares/checkRole.js'
@@ -22,6 +23,7 @@ router.delete('/:id', auth.jwt, checkRole([UserRole.ADMIN, UserRole.MANAGER]), r
 // 一般用戶也可以使用的路由
 router.get('/all', auth.jwt, getAll)
 router.get('/years', auth.jwt, getYearOptions)
+router.get('/years/:theme', auth.jwt, getYearsByTheme)
 router.get('/:year/:theme', auth.jwt, getByYearAndTheme)
 router.get('/:id', auth.jwt, getById)
 

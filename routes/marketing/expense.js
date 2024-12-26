@@ -5,7 +5,8 @@ import {
   getById,
   edit,
   remove,
-  getMonthlyStats
+  getMonthlyStats,
+  getYearsByTheme
 } from '../../controllers/marketing/expense.js'
 import * as auth from '../../middlewares/auth.js'
 import checkRole from '../../middlewares/checkRole.js'
@@ -21,6 +22,7 @@ router.delete('/:id', auth.jwt, checkRole([UserRole.ADMIN, UserRole.MANAGER]), r
 // 一般用戶也可以使用的路由
 router.get('/all', auth.jwt, getAll)
 router.get('/monthly-stats', auth.jwt, getMonthlyStats)
+router.get('/years/:theme', auth.jwt, getYearsByTheme)
 router.get('/:id', auth.jwt, getById)
 
 export default router 

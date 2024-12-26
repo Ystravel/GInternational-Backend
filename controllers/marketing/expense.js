@@ -263,24 +263,45 @@ export const remove = async (req, res) => {
 // 取得月度統計
 export const getMonthlyStats = async (req, res) => {
   try {
-    const { year, month, theme, channel, platform } = req.query
+    const { year, theme } = req.query
 
-    if (!year || !month || !theme) {
+    if (!year || !theme) {
       throw new Error('PARAMS_REQUIRED')
     }
 
-    const total = await Expense.getMonthlyTotal(
-      parseInt(year),
-      parseInt(month),
-      theme,
-      channel,
-      platform
-    )
+    // 查詢該年度該主題的所有費用
+    const expenses = await Expense.find({
+      year: parseInt(year),
+      theme: new mongoose.Types.ObjectId(theme)
+    })
+    .populate('theme', 'name')
+    .populate('channel', 'name')
+    .populate('platform', 'name')
+    .populate('details.detail', 'name')
+    .lean()
 
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
-      result: { total }
+      result: expenses
+    })
+  } catch (error) {
+    handleError(res, error)
+  }
+}
+
+// 取得年度選項
+export const getYearsByTheme = async (req, res) => {
+  try {
+    const { theme } = req.params
+    
+    const years = await Expense.distinct('year', { theme })
+    years.sort((a, b) => b - a)
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result: years
     })
   } catch (error) {
     handleError(res, error)
