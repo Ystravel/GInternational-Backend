@@ -4,7 +4,8 @@ import {
   getAll,
   edit,
   remove,
-  getOptions
+  getOptions,
+  getMaxOrder
 } from '../../controllers/marketing/category.js'
 import * as auth from '../../middlewares/auth.js'
 import checkRole from '../../middlewares/checkRole.js'
@@ -17,6 +18,7 @@ router.post('/', auth.jwt, checkRole([UserRole.ADMIN, UserRole.MANAGER]), create
 router.get('/all', auth.jwt, checkRole([UserRole.ADMIN, UserRole.MANAGER]), getAll)
 router.patch('/:id', auth.jwt, checkRole([UserRole.ADMIN, UserRole.MANAGER]), edit)
 router.delete('/:id', auth.jwt, checkRole([UserRole.ADMIN, UserRole.MANAGER]), remove)
+router.get('/maxOrder', auth.jwt, checkRole([UserRole.ADMIN, UserRole.MANAGER]), getMaxOrder)
 
 // 一般用戶也可以使用的路由
 router.get('/options', auth.jwt, getOptions)

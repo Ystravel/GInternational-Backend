@@ -21,7 +21,6 @@ const categorySchema = new Schema({
   // 排序
   order: {
     type: Number,
-    default: 0
   },
   // 建立者
   creator: {
