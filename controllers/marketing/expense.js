@@ -4,7 +4,7 @@ import validator from 'validator'
 import { logCreate, logUpdate, logDelete } from '../../services/auditLogService.js'
 import mongoose from 'mongoose'
 
-// 創建實際花費
+// 創建實際支出
 export const create = async (req, res) => {
   try {
     console.log('Creating expense with data:', req.body)
@@ -28,7 +28,7 @@ export const create = async (req, res) => {
 
     res.status(StatusCodes.OK).json({
       success: true,
-      message: '實際花費創建成功',
+      message: '實際支出創建成功',
       result: populatedResult
     })
   } catch (error) {
@@ -37,7 +37,7 @@ export const create = async (req, res) => {
   }
 }
 
-// 取得實際花費列表
+// 取得實際支出列表
 export const getAll = async (req, res) => {
   try {
     const query = { }
@@ -128,7 +128,7 @@ export const getAll = async (req, res) => {
   }
 }
 
-// 取得單一實際花費
+// 取得單一實際支出
 export const getById = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error('ID')
@@ -153,7 +153,7 @@ export const getById = async (req, res) => {
   }
 }
 
-// 編輯實際花費
+// 編輯實際支出
 export const edit = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error('ID')
@@ -230,7 +230,7 @@ export const edit = async (req, res) => {
 
     res.status(StatusCodes.OK).json({
       success: true,
-      message: '實際花費更新成功',
+      message: '實際支出更新成功',
       result: updatedExpense
     })
   } catch (error) {
@@ -238,7 +238,7 @@ export const edit = async (req, res) => {
   }
 }
 
-// 刪除實際花費
+// 刪除實際支出
 export const remove = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error('ID')
@@ -253,7 +253,7 @@ export const remove = async (req, res) => {
 
     res.status(StatusCodes.OK).json({
       success: true,
-      message: '實際花費刪除成功'
+      message: '實際支出刪除成功'
     })
   } catch (error) {
     handleError(res, error)
@@ -324,7 +324,7 @@ const handleError = (res, error) => {
   if (error.message === 'NOT_FOUND') {
     return res.status(StatusCodes.NOT_FOUND).json({
       success: false,
-      message: '找不到實際花費記錄'
+      message: '找不到實際支出記錄'
     })
   }
 
