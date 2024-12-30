@@ -6,7 +6,9 @@ import {
   edit,
   remove,
   getMonthlyStats,
-  getYearsByTheme
+  getYearsByTheme,
+  getLineExpenses,
+  getLineOptions
 } from '../../controllers/marketing/expense.js'
 import * as auth from '../../middlewares/auth.js'
 import checkRole from '../../middlewares/checkRole.js'
@@ -24,5 +26,11 @@ router.get('/all', auth.jwt, getAll)
 router.get('/monthly-stats', auth.jwt, getMonthlyStats)
 router.get('/years/:theme', auth.jwt, getYearsByTheme)
 router.get('/:id', auth.jwt, getById)
+
+// 新增行銷各線實際支出表的路由
+router.get('/line-expenses', auth.jwt, getLineExpenses)
+
+// 新增行銷線別選項的路由
+router.get('/lines/options', auth.jwt, getLineOptions)
 
 export default router 

@@ -9,44 +9,37 @@ const router = Router()
 
 router.post('/',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   create
 )
 
 router.get('/',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   search
 )
 
 router.delete('/:id',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   remove
 )
 
 router.post('/upload/pdf',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   uploadForm,
   uploadPDF
 )
 
 router.get('/ray-huang-quotation/next-number',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   getRayHuangQuotationNextNumber
 )
 
 router.get('/ystravel-quotation/next-number',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   getYstravelQuotationNextNumber
 )
 
 router.get('/suggestions',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.MANAGER]),
   getSuggestions
 )
 

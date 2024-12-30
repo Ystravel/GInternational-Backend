@@ -308,6 +308,77 @@ export const getYearsByTheme = async (req, res) => {
   }
 }
 
+// 取得行銷各線實際支出表
+export const getLineExpenses = async (req, res) => {
+  try {
+    const { year, theme, lines, month } = req.query
+
+    if (!year || !theme || !lines || !month) {
+      throw new Error('PARAMS_REQUIRED')
+    }
+
+    const lineIds = Array.isArray(lines) ? lines.map(id => new mongoose.Types.ObjectId(id)) : lines.split(',').map(id => new mongoose.Types.ObjectId(id))
+    const startDate = new Date(year, month - 1, 1)
+    const endDate = new Date(year, month, 0, 23, 59, 59)
+
+    const expenses = await Expense.find({
+      year: parseInt(year),
+      theme: new mongoose.Types.ObjectId(theme),
+      'details.detail': { $in: lineIds },
+      invoiceDate: { $gte: startDate, $lte: endDate }
+    })
+    .populate('platform', 'name')
+    .populate('details.detail', 'name')
+    .lean()
+
+    const platformMap = {}
+
+    expenses.forEach(expense => {
+      const platformName = expense.platform.name
+      if (!platformMap[platformName]) {
+        platformMap[platformName] = {}
+      }
+
+      expense.details.forEach(detail => {
+        const lineName = detail.detail.name
+        if (!platformMap[platformName][lineName]) {
+          platformMap[platformName][lineName] = 0
+        }
+        platformMap[platformName][lineName] += detail.amount
+      })
+    })
+
+    const result = Object.keys(platformMap).map(platformName => ({
+      platformName,
+      expenses: platformMap[platformName]
+    }))
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result
+    })
+  } catch (error) {
+    handleError(res, error)
+  }
+}
+
+// 取得行銷線別選項
+export const getLineOptions = async (req, res) => {
+  try {
+    const lines = await Expense.distinct('details.detail')
+    const lineDetails = await mongoose.model('marketingCategories').find({ _id: { $in: lines } }, 'name')
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result: lineDetails
+    })
+  } catch (error) {
+    handleError(res, error)
+  }
+}
+
 // 統一錯誤處理
 const handleError = (res, error) => {
   console.error('Error details:', error)
