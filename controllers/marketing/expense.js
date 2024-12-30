@@ -317,41 +317,118 @@ export const getLineExpenses = async (req, res) => {
       throw new Error('PARAMS_REQUIRED')
     }
 
-    const lineIds = Array.isArray(lines) ? lines.map(id => new mongoose.Types.ObjectId(id)) : lines.split(',').map(id => new mongoose.Types.ObjectId(id))
-    const startDate = new Date(year, month - 1, 1)
-    const endDate = new Date(year, month, 0, 23, 59, 59)
+    const lineIds = Array.isArray(lines) 
+      ? lines.map(id => new mongoose.Types.ObjectId(id)) 
+      : lines.split(',').map(id => new mongoose.Types.ObjectId(id))
 
-    const expenses = await Expense.find({
-      year: parseInt(year),
-      theme: new mongoose.Types.ObjectId(theme),
-      'details.detail': { $in: lineIds },
-      invoiceDate: { $gte: startDate, $lte: endDate }
-    })
-    .populate('platform', 'name')
-    .populate('details.detail', 'name')
-    .lean()
+    const startDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, 1))
+    const endDate = new Date(Date.UTC(parseInt(year), parseInt(month), 0, 23, 59, 59, 999))
 
-    const platformMap = {}
-
-    expenses.forEach(expense => {
-      const platformName = expense.platform.name
-      if (!platformMap[platformName]) {
-        platformMap[platformName] = {}
-      }
-
-      expense.details.forEach(detail => {
-        const lineName = detail.detail.name
-        if (!platformMap[platformName][lineName]) {
-          platformMap[platformName][lineName] = 0
+    // 使用聚合管道查詢
+    const expenses = await Expense.aggregate([
+      {
+        $match: {
+          year: parseInt(year),
+          theme: new mongoose.Types.ObjectId(theme),
+          'details.detail': { $in: lineIds },
+          invoiceDate: {
+            $gte: startDate,
+            $lte: endDate
+          }
         }
-        platformMap[platformName][lineName] += detail.amount
+      },
+      {
+        $lookup: {
+          from: 'marketingcategories',
+          localField: 'platform',
+          foreignField: '_id',
+          as: 'platformInfo'
+        }
+      },
+      {
+        $unwind: '$platformInfo'
+      },
+      {
+        $unwind: '$details'
+      },
+      {
+        $lookup: {
+          from: 'marketingcategories',
+          localField: 'details.detail',
+          foreignField: '_id',
+          as: 'detailInfo'
+        }
+      },
+      {
+        $unwind: '$detailInfo'
+      },
+      {
+        $match: {
+          'details.detail': { $in: lineIds }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            platform: '$platformInfo.name',
+            line: '$detailInfo.name'
+          },
+          amount: { $sum: '$details.amount' }
+        }
+      },
+      {
+        $group: {
+          _id: '$_id.platform',
+          lines: {
+            $push: {
+              line: '$_id.line',
+              amount: '$amount'
+            }
+          },
+          total: { $sum: '$amount' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          platformName: '$_id',
+          lines: 1,
+          total: 1
+        }
+      }
+    ])
+
+    // 重新組織數據結構
+    const result = expenses.map(platform => {
+      const lineExpenses = {}
+      platform.lines.forEach(line => {
+        lineExpenses[line.line] = Number(line.amount)
+      })
+      return {
+        platformName: platform.platformName,
+        expenses: lineExpenses,
+        total: Number(platform.total)
+      }
+    })
+
+    // 計算每個線別的總和
+    const lineTotals = {}
+    result.forEach(platform => {
+      Object.entries(platform.expenses).forEach(([line, amount]) => {
+        lineTotals[line] = (lineTotals[line] || 0) + Number(amount)
       })
     })
 
-    const result = Object.keys(platformMap).map(platformName => ({
-      platformName,
-      expenses: platformMap[platformName]
-    }))
+    // 添加總計行
+    if (result.length > 0) {
+      result.push({
+        platformName: 'Total',
+        expenses: lineTotals,
+        total: Object.values(lineTotals).reduce((sum, amount) => sum + Number(amount), 0)
+      })
+    }
+
+    console.log('Final result:', JSON.stringify(result, null, 2))
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -359,6 +436,7 @@ export const getLineExpenses = async (req, res) => {
       result
     })
   } catch (error) {
+    console.error('Error in getLineExpenses:', error)
     handleError(res, error)
   }
 }
