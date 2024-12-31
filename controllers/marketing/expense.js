@@ -457,6 +457,117 @@ export const getLineOptions = async (req, res) => {
   }
 }
 
+// 取得行銷各線實際支出總表
+export const getLineExpensesTotal = async (req, res) => {
+  try {
+    const { year, theme } = req.query
+
+    if (!year || !theme) {
+      throw new Error('PARAMS_REQUIRED')
+    }
+
+    // 使用聚合管道查詢
+    const expenses = await Expense.aggregate([
+      {
+        $match: {
+          year: parseInt(year),
+          theme: new mongoose.Types.ObjectId(theme)
+        }
+      },
+      {
+        $unwind: '$details'
+      },
+      {
+        $lookup: {
+          from: 'marketingcategories',
+          localField: 'details.detail',
+          foreignField: '_id',
+          as: 'detailInfo'
+        }
+      },
+      {
+        $unwind: '$detailInfo'
+      },
+      {
+        $group: {
+          _id: {
+            line: '$detailInfo.name',
+            lineId: '$detailInfo._id',
+            order: '$detailInfo.order',
+            month: { $month: '$invoiceDate' }
+          },
+          amount: { $sum: '$details.amount' }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            line: '$_id.line',
+            lineId: '$_id.lineId',
+            order: '$_id.order'
+          },
+          monthlyExpenses: {
+            $push: {
+              month: '$_id.month',
+              amount: '$amount'
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          lineName: '$_id.line',
+          lineId: '$_id.lineId',
+          order: '$_id.order',
+          expenses: {
+            $reduce: {
+              input: '$monthlyExpenses',
+              initialValue: {
+                JAN: 0, FEB: 0, MAR: 0, APR: 0, MAY: 0, JUN: 0,
+                JUL: 0, AUG: 0, SEP: 0, OCT: 0, NOV: 0, DEC: 0
+              },
+              in: {
+                $switch: {
+                  branches: [
+                    { case: { $eq: ['$$this.month', 1] }, then: { $mergeObjects: ['$$value', { JAN: '$$this.amount' }] } },
+                    { case: { $eq: ['$$this.month', 2] }, then: { $mergeObjects: ['$$value', { FEB: '$$this.amount' }] } },
+                    { case: { $eq: ['$$this.month', 3] }, then: { $mergeObjects: ['$$value', { MAR: '$$this.amount' }] } },
+                    { case: { $eq: ['$$this.month', 4] }, then: { $mergeObjects: ['$$value', { APR: '$$this.amount' }] } },
+                    { case: { $eq: ['$$this.month', 5] }, then: { $mergeObjects: ['$$value', { MAY: '$$this.amount' }] } },
+                    { case: { $eq: ['$$this.month', 6] }, then: { $mergeObjects: ['$$value', { JUN: '$$this.amount' }] } },
+                    { case: { $eq: ['$$this.month', 7] }, then: { $mergeObjects: ['$$value', { JUL: '$$this.amount' }] } },
+                    { case: { $eq: ['$$this.month', 8] }, then: { $mergeObjects: ['$$value', { AUG: '$$this.amount' }] } },
+                    { case: { $eq: ['$$this.month', 9] }, then: { $mergeObjects: ['$$value', { SEP: '$$this.amount' }] } },
+                    { case: { $eq: ['$$this.month', 10] }, then: { $mergeObjects: ['$$value', { OCT: '$$this.amount' }] } },
+                    { case: { $eq: ['$$this.month', 11] }, then: { $mergeObjects: ['$$value', { NOV: '$$this.amount' }] } },
+                    { case: { $eq: ['$$this.month', 12] }, then: { $mergeObjects: ['$$value', { DEC: '$$this.amount' }] } }
+                  ],
+                  default: '$$value'
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        $sort: { order: 1 }
+      }
+    ])
+
+    console.log('Line expenses total:', JSON.stringify(expenses, null, 2))
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result: expenses
+    })
+  } catch (error) {
+    console.error('Error in getLineExpensesTotal:', error)
+    handleError(res, error)
+  }
+}
+
 // 統一錯誤處理
 const handleError = (res, error) => {
   console.error('Error details:', error)

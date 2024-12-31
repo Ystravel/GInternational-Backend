@@ -8,7 +8,8 @@ import {
   getMonthlyStats,
   getYearsByTheme,
   getLineExpenses,
-  getLineOptions
+  getLineOptions,
+  getLineExpensesTotal
 } from '../../controllers/marketing/expense.js'
 import * as auth from '../../middlewares/auth.js'
 import checkRole from '../../middlewares/checkRole.js'
@@ -23,6 +24,7 @@ router.delete('/:id', auth.jwt, checkRole([UserRole.ADMIN, UserRole.MANAGER]), r
 
 // 新增行銷各線實際支出表的路由
 router.get('/line-expenses', auth.jwt, getLineExpenses)
+router.get('/line-expenses-total', auth.jwt, getLineExpensesTotal)
 
 // 新增行銷線別選項的路由
 router.get('/lines/options', auth.jwt, getLineOptions)
