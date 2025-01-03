@@ -342,38 +342,45 @@ export const getSuggestions = async (req, res) => {
 // 取得銳皇報價單的下一個單號
 export const getRayHuangQuotationNextNumber = async (req, res) => {
   try {
+    const { templateId } = req.query
+    if (!templateId) {
+      throw new Error('缺少必要參數')
+    }
+
+    // 取得當前年月日
     const today = new Date()
-    const currentYear = today.getFullYear()
-    const currentMonth = String(today.getMonth() + 1).padStart(2, '0')
-    const currentDay = String(today.getDate()).padStart(2, '0')
-    const currentDate = `${currentYear}${currentMonth}${currentDay}`
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+    const prefix = `GR${year}${month}${day}`
 
     // 查找當天最大的流水號
     const latestForm = await Form.findOne({
-      formNumber: new RegExp(`^${currentDate}`),
-      formTemplate: req.query.templateId
+      formNumber: new RegExp(`^${prefix}`),
+      formTemplate: templateId
     }).sort({ formNumber: -1 })
 
-    let nextNumber
+    let nextNumber = 1
     if (latestForm) {
       // 如果當天有資料，取最後4位數字(流水號)加1
       const currentSeq = parseInt(latestForm.formNumber.slice(-4))
-      nextNumber = `${currentDate}${String(currentSeq + 1).padStart(4, '0')}`
-    } else {
-      // 如果當天沒有資料，從0001開始
-      nextNumber = `${currentDate}0001`
+      nextNumber = currentSeq + 1
     }
+
+    // 組合新單號 (GR + 年月日 + 4位數序號)
+    const formNumber = `${prefix}${String(nextNumber).padStart(4, '0')}`
 
     res.status(StatusCodes.OK).json({
       success: true,
-      message: '',
-      result: nextNumber
+      message: '取得下一個單號成功',
+      result: formNumber
     })
   } catch (error) {
     console.error('取得銳皇報價單單號失敗:', error)
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
-      message: '取得單號失敗'
+      message: '取得單號失敗',
+      error: error.message
     })
   }
 }

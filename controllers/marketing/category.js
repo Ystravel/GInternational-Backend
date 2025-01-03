@@ -2,6 +2,8 @@ import { StatusCodes } from 'http-status-codes'
 import Category from '../../models/marketing/category.js'
 import validator from 'validator'
 import { logCreate, logUpdate, logDelete } from '../../services/auditLogService.js'
+import Budget from '../../models/marketing/budget.js'
+import Expense from '../../models/marketing/expense.js'
 
 // 創建廣告類別
 export const create = async (req, res) => {
@@ -230,6 +232,33 @@ export const remove = async (req, res) => {
     const category = await Category.findById(req.params.id)
     if (!category) throw new Error('NOT_FOUND')
 
+    // 檢查是否有關聯的預算資料
+    const budgetCount = await Budget.countDocuments({
+      $or: [
+        { theme: category._id },
+        { 'items.channel': category._id },
+        { 'items.platform': category._id }
+      ]
+    })
+
+    if (budgetCount > 0) {
+      throw new Error('BUDGET_REFERENCE')
+    }
+
+    // 檢查是否有關聯的支出資料
+    const expenseCount = await Expense.countDocuments({
+      $or: [
+        { theme: category._id },
+        { channel: category._id },
+        { platform: category._id },
+        { 'details.detail': category._id }
+      ]
+    })
+
+    if (expenseCount > 0) {
+      throw new Error('EXPENSE_REFERENCE')
+    }
+
     // 執行刪除
     await Category.deleteOne({ _id: category._id })
 
@@ -358,6 +387,20 @@ const handleError = (res, error) => {
     return res.status(StatusCodes.BAD_REQUEST).json({
       success: false,
       message: '排序超出範圍'
+    })
+  }
+
+  if (error.message === 'BUDGET_REFERENCE') {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      success: false,
+      message: '此分類已有預算資料使用，無法刪除'
+    })
+  }
+
+  if (error.message === 'EXPENSE_REFERENCE') {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      success: false,
+      message: '此分類已有實際支出資料使用，無法刪除'
     })
   }
 
